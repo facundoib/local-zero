@@ -68,6 +68,8 @@ It uses Lemonade SDK as the local LLM backend via its OpenAI-compatible HTTP API
 
 ## 5. Software dependencies
 
+> **End user vs developer.** Section 5.1 is everything an end user needs. Section 5.2 is for developers building the app from source. End users do **not** install Node, Rust, or build tools — they download a single Tauri-bundled installer from GitHub Releases.
+
 ### 5.1 Runtime (end user)
 - **Lemonade Server** ≥ 10.2 (Windows installer or platform equivalent), serving on `http://localhost:13305/api/v1`
 - **AMD Adrenalin** ≥ 25.5 (AMD GPU users) OR **NVIDIA driver** ≥ 550 (NVIDIA users)
@@ -443,9 +445,9 @@ Phase A (resolved 2026-04-30) — see [docs/decisions/v0.1-open-questions.md](do
 6. ~~Tauri 2 SSE streaming~~ → **Resolved.** Native `window.fetch()` in the WebView, not `@tauri-apps/plugin-http`.
 7. ~~Cold-start UX without Lemonade~~ → **Resolved.** Banner with link, no auto-start. Educational alignment.
 
-Phase B (pending — needs hardware testing):
+Phase B:
 
-3. **VRAM detection on Windows from Tauri/Rust.** Need a stable cross-vendor way to read free VRAM to choose between Qwen3 14B and Qwen3 4B at startup. Candidates: `wgpu` device introspection, NVML/ADL bindings (vendor-specific), or fall back to user-selected model in settings.
+3. ~~VRAM detection on Windows~~ → **Resolved 2026-04-30.** Windows DXGI (`IDXGIFactory6`/`IDXGIAdapter4`), Windows-only scope. Validated with prototype on RTX 5060 Ti. See [decisions doc §OQ#3](docs/decisions/v0.1-open-questions.md#oq3).
 5. **Tauri 2 + microphone permission flow on Windows 11 25H2.** Verify the `tauri-plugin-mic-recorder` v2+ permission prompt does not require manual capability JSON twiddling.
 
 Each gets its own resolution doc under `docs/decisions/` when complete.

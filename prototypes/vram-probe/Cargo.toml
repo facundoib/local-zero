@@ -1,0 +1,18 @@
+[package]
+name = "vram-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "VRAM detection probe for Local Zero — Windows-only, uses DXGI"
+
+[dependencies.windows]
+version = "0.59"
+features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+]
+
+[profile.release]
+opt-level = 3
+lto = false
