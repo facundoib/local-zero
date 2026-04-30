@@ -1,0 +1,47 @@
+{
+  "name": "local-zero",
+  "version": "0.0.1",
+  "description": "Build your first local AI app from zero. Tauri-based desktop companion that uses Lemonade SDK as a local LLM backend.",
+  "license": "Apache-2.0",
+  "author": "Facundo Ibarzabal <facundoibarzabal@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/facundoib/local-zero.git"
+  },
+  "homepage": "https://github.com/facundoib/local-zero#readme",
+  "bugs": {
+    "url": "https://github.com/facundoib/local-zero/issues"
+  },
+  "keywords": [
+    "tauri",
+    "local-ai",
+    "lemonade",
+    "rag",
+    "llm",
+    "amd",
+    "ryzen-ai",
+    "spanish",
+    "tutorial"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4",
+    "@tauri-apps/cli": "^2"
+  }
+}
