@@ -448,7 +448,7 @@ Phase A (resolved 2026-04-30) — see [docs/decisions/v0.1-open-questions.md](do
 Phase B:
 
 3. ~~VRAM detection on Windows~~ → **Resolved 2026-04-30.** Windows DXGI (`IDXGIFactory6`/`IDXGIAdapter4`), Windows-only scope. Validated with prototype on RTX 5060 Ti. See [decisions doc §OQ#3](docs/decisions/v0.1-open-questions.md#oq3).
-5. **Tauri 2 + microphone permission flow on Windows 11 25H2.** Verify the `tauri-plugin-mic-recorder` v2+ permission prompt does not require manual capability JSON twiddling.
+5. ~~Tauri 2 + microphone permission flow~~ → **Deferred to F6 (Voice I/O) implementation.** Approach pre-built and stored in [`prototypes/mic-test/`](prototypes/mic-test/). Native `getUserMedia` + `MediaRecorder` in WebView2 expected to work; risk low. See [decisions doc §OQ#5](docs/decisions/v0.1-open-questions.md#oq5).
 
 Each gets its own resolution doc under `docs/decisions/` when complete.
 
