@@ -1,8 +1,8 @@
 # Local Zero — Technical Specification
 
-**Status:** Draft v0.0.1
+**Status:** Draft v0.0.2
 **Target release:** v0.1
-**Last updated:** 2026-04-29
+**Last updated:** 2026-05-04
 **License:** Apache-2.0
 
 This document is the source of truth for what Local Zero v0.1 does and how it is built. If code and SPEC diverge, SPEC wins until updated by PR.
@@ -11,7 +11,7 @@ This document is the source of truth for what Local Zero v0.1 does and how it is
 
 ## 1. Overview
 
-Local Zero is a Tauri 2 desktop application that walks a self-taught LATAM developer through building a portfolio-grade Retrieval-Augmented Generation (RAG) app running entirely on their own machine. The app is both a working RAG tool (the user can use it to ask questions about their own documents) and a teaching artifact (each step of the pipeline is exposed and explained in Spanish).
+Local Zero is a Tauri 2 desktop application that walks a self-taught LATAM developer through building a Retrieval-Augmented Generation (RAG) app running entirely on their own machine. The app is both a working RAG tool (the user can use it to ask questions about their own documents) and a teaching artifact (each step of the pipeline is exposed and explained in Spanish). It also exports a runnable starter the user must extend with their own corpus and evaluations to turn into a portfolio piece — see F8 and [docs/decisions/v0.1-f8-redesign.md](docs/decisions/v0.1-f8-redesign.md).
 
 It uses Lemonade SDK as the local LLM backend via its OpenAI-compatible HTTP API. No cloud calls, no API keys, no recurring costs.
 
@@ -23,7 +23,7 @@ It uses Lemonade SDK as the local LLM backend via its OpenAI-compatible HTTP API
 2. Let the user drop a folder of plain-text documents (PDF, TXT, MD) and chat with them in Spanish.
 3. Expose the RAG pipeline in a side panel: which chunks were retrieved, with what similarity score, what prompt was sent, what tokens came back.
 4. Provide an optional voice loop: speak the question, hear the answer (Whisper + Kokoro via Lemonade).
-5. Export a self-contained portfolio repository the user can push to their own GitHub with one CLI command.
+5. Export a runnable starter project the user must extend with their own corpus and evaluations before it can become a portfolio piece. The starter is explicitly not the portfolio — what the user builds on top is.
 6. Stay 100% offline after Lemonade and the chosen models are downloaded. Verifiable by disconnecting the network.
 
 ## 3. Non-goals (v0.1)
@@ -107,7 +107,7 @@ See [docs/decisions/v0.1-open-questions.md](docs/decisions/v0.1-open-questions.m
 │  │   - Chat UI            │   │   - File system access         │  │
 │  │   - Pipeline panel     │◄──┤   - SQLite (app state, vecs)   │  │
 │  │   - Document drop zone │   │   - PDF/text extractors        │  │
-│  │   - Voice controls     │   │   - Export-to-portfolio writer │  │
+│  │   - Voice controls     │   │   - Starter export writer      │  │
 │  │   - Educational drawer │   └─────────────┬──────────────────┘  │
 │  └────────────┬───────────┘                 │                     │
 │               │                             │                     │
@@ -150,6 +150,7 @@ All data lives in a single SQLite database at the Tauri app data dir (`%APPDATA%
 - **`embeddings`** — `(chunk_id, vector BLOB, dim, model)`
 - **`sessions`** — `(id, started_at, ended_at)` (one session = one app launch)
 - **`messages`** — `(id, session_id, role, content, created_at)` (chat history per session, not persisted across launches per non-goal #6)
+- **`evals`** — `(id, question, expected_substring, created_at)` (user-authored evaluation cases for F8 export gate G2; persisted across launches; scoped implicitly to the active corpus per non-goal #1)
 - **`settings`** — `(key, value)` (KV store for backend URL, voice on/off, chosen model, etc.)
 
 ### 7.2 Vector index
@@ -274,31 +275,42 @@ Each feature has: ID, description, inputs, outputs, key behaviors, error handlin
   - Panel is collapsible; remembered per session.
   - All explanations are pre-written static Spanish strings shipped with the app, not LLM-generated, so they stay correct and reproducible.
 
-### F8. Export to portfolio
+### F8. Export to runnable starter
 
 - **ID:** F8
-- **Description:** One-click action that creates a self-contained, runnable mini-project the user can push to their own GitHub as a portfolio piece.
-- **Trigger:** "Exportar a GitHub" button in the main UI.
+- **Description:** One-click action that exports a starter mini-project the user can extend, evaluate, and push to GitHub. **The starter is not, by itself, a portfolio piece** — it becomes one only after the user provides their own corpus and writes their own evaluation tests on top. This is enforced by three gates that must all pass before export is enabled. Rationale: [docs/decisions/v0.1-f8-redesign.md](docs/decisions/v0.1-f8-redesign.md).
+- **Trigger:** "Exportar starter" button in the main UI. Disabled until all three gates pass; tooltip on hover names the missing gate.
+- **Gates (must all pass before button is enabled):**
+  - **G1 — User-supplied corpus.** At least one document in the active document set must have a SHA-256 different from the placeholder `sample.md` shipped with Local Zero. The user must have ingested their own document(s) via F1 before exporting. Tooltip when locked: *"Cargá al menos un documento propio antes de exportar."*
+  - **G2 — User-authored evaluations.** The user must author ≥5 evaluation cases in the in-app eval editor before export. Each case has shape `{question: string, expected_substring: string}` and is persisted in the `evals` table (§7.1). v0.1 uses substring matching only; LLM-as-judge is deferred to v0.2 (§14). Tooltip when locked: *"Escribí al menos 5 evaluaciones para tu starter."*
+  - **G3 — User-authored README context.** The user must fill three free-text fields (>30 chars each) in the export dialog: *"¿Qué problema resuelve este proyecto?"*, *"¿Por qué elegiste este dominio?"*, *"¿Qué aprendiste y qué harías distinto?"*. These strings are injected verbatim into the exported README under labeled sections.
 - **Output:** a folder selected by the user containing:
-  - `README.md` — Spanish-first description of what the user built, with an English summary at the bottom for international recruiters. Includes a quickstart, a stack list, and a one-paragraph "what this proves about me as a developer".
-  - `main.ts` — minimal TypeScript script (Node 20+) that reproduces the RAG pipeline against Lemonade. Loads docs from `./docs/`, embeds, retrieves, generates. ~150 lines.
-  - `package.json` — minimal deps (just `node-fetch` or native fetch on Node 20+).
+  - `README.md` — Spanish-first with an English summary. Includes the three G3 user-authored sections verbatim, plus a quickstart, a stack list, and an explicit framing block: *"Este repo es un starter — no es todavía un portfolio. Lo que lo convierte en portfolio son los commits que hagas encima: agregá features, escribí más evaluaciones, deployalo, documentá lo que aprendiste."*
+  - `main.ts` — minimal TypeScript script (Node 20+) that reproduces the RAG pipeline against Lemonade. Loads docs from `./data/`, embeds, retrieves, generates. ~150 lines.
+  - `eval-runner.ts` — minimal eval runner (~30 lines) that loads the JSON cases from `evals/`, runs each through the pipeline, and reports pass/fail by substring match.
+  - `evals/*.json` — the user's ≥5 evaluation cases from G2.
+  - `data/*` — the user's ingested documents (the placeholder is excluded by G1; the export is the user's corpus, not the placeholder).
+  - `package.json` — minimal deps (native fetch on Node 20+).
   - `.gitignore` — node_modules, .env, *.db.
-  - `LICENSE` — MIT (different from Local Zero itself; the user owns their portfolio repo).
-  - `docs/sample.md` — placeholder document so the script runs out of the box.
+  - `LICENSE` — MIT (different from Local Zero itself; the user owns their starter repo).
 - **Post-export instructions** shown in a modal:
   ```
-  ¡Listo! Para subir tu repo a GitHub:
+  ¡Listo! Para subir tu starter a GitHub:
 
   cd <carpeta-elegida>
   git init && git add . && git commit -m "Initial commit"
-  gh repo create mi-primera-app-de-ia --public --source=. --push
+  gh repo create <nombre> --public --source=. --push
+
+  Recordá: este repo todavía no es un portfolio.
+  Lo que lo convierte en portfolio son los commits que hagas encima.
   ```
 - **Behaviors:**
   - Local Zero never pushes on the user's behalf in v0.1. The user runs `gh` themselves.
-  - The exported `main.ts` is the same logic as Local Zero's RAG, simplified and free of UI code, so it stands as readable evidence of skill.
+  - The exported `main.ts` and `eval-runner.ts` are intentionally minimal so the user can read, understand, and extend them.
+  - The export button's enabled state is a derived predicate over (G1 ∧ G2 ∧ G3); compute reactively in the frontend and re-enforce in the Rust command (defense in depth).
 - **Errors:**
   - Folder write permission denied: standard OS error surface.
+  - Any gate not passing: button stays disabled with a tooltip naming the missing gate.
 
 ### F9. Settings
 
@@ -386,7 +398,7 @@ The release is shippable when **all** of the following pass on a clean Windows 1
 3. Type a Spanish question referencing the PDF. The LLM streams a Spanish-language answer that cites information from the PDF. No English leakage. No `<think>` blocks. No "as an AI" phrases.
 4. Toggle voice mode. Ask the same question by voice. Receive a spoken Spanish answer via `ef_dora`.
 5. **Offline test.** Disable network adapter. Repeat steps 2-4. App functions identically. Pipeline panel updates correctly.
-6. Click "Exportar a GitHub". App writes a folder with the 6 files described in F8. `node main.ts` from that folder reproduces a basic RAG response against the same Lemonade instance.
+6. **Export gates.** With no user-supplied documents and no user-authored evals, the "Exportar starter" button is disabled with tooltips naming the missing gates. Add at least one user document → G1 unlocks. Author ≥5 eval cases in the in-app editor → G2 unlocks. Fill the three G3 README fields (>30 chars each) → button enables. Click it: app writes a folder containing `main.ts`, `eval-runner.ts`, `evals/*.json` (≥5), `data/*` (user's docs only — placeholder excluded), `README.md` (with the three G3 sections present verbatim), `package.json`, `.gitignore`, `LICENSE`. `node main.ts` reproduces a RAG response against the same Lemonade instance. `node eval-runner.ts` runs all eval cases and prints pass/fail per case.
 7. App runs without crashes for 30 minutes of active use (4 different document sets, 20 chat turns, voice toggled on and off).
 8. Cold launch on minimum hardware (RTX 4060 Ti 16 GB / RX 9060 XT 16 GB, 32 GB RAM) succeeds and an 8B fallback model loads automatically if VRAM detection reports <12 GB free.
 
@@ -434,6 +446,8 @@ Captured here so contributors don't accidentally implement them in v0.1 PRs. Ord
 - macOS code-signing + DMG
 - Windows code-signing + MSI
 - Auto-updater (Tauri's built-in updater plugin)
+- **F8 differentiator add-ons (Option D from research).** Opt-in pre-wired layers the user picks before export: (D1) eval harness via Promptfoo or DeepTeam with one example; (D2) domain-specific corpus loader (Argentine BORA, Mexican DOF, Spanish-language PubMed-mirror); (D3) smoke red-team with Garak/DeepTeam against the local OpenAI-compatible server.
+- **LLM-as-judge** for `eval-runner.ts` (replaces v0.1's substring matching).
 
 ---
 
