@@ -21,9 +21,9 @@ fn vendor_name(id: u32) -> &'static str {
 fn local_zero_verdict(total_mb: u64) -> &'static str {
     let total_gb = total_mb / 1024;
     if total_gb >= 12 {
-        "default to Qwen3-14B-Instruct-GGUF (Q4_K_M, ~9 GB) — comfortable"
+        "default to Qwen3-14B-GGUF (Q4_0, ~8.5 GB) — comfortable, thinking disabled at runtime"
     } else if total_gb >= 6 {
-        "default to Qwen3-4B-Instruct-GGUF (Q4_K_M, ~2.5 GB) — fits with headroom"
+        "default to Qwen3-4B-Instruct-2507-GGUF (Q4_K_M, ~2.5 GB) — fits with headroom"
     } else if total_gb >= 3 {
         "default to Qwen3-0.6B-GGUF (already in registry) — small but workable"
     } else {

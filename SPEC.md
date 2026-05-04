@@ -82,15 +82,17 @@ It uses Lemonade SDK as the local LLM backend via its OpenAI-compatible HTTP API
 - Platform Tauri prerequisites per https://tauri.app/start/prerequisites/
 
 ### 5.3 Default models (auto-downloaded by Lemonade on first run)
-| Role | Model | Quantization | Approx. VRAM |
-|---|---|---|---|
-| LLM (chat) | `Qwen3-14B-Instruct-GGUF` | Q4_K_M | ~9 GB |
-| LLM fallback (small) | `Qwen3-4B-Instruct-GGUF` | Q4_K_M | ~2.5 GB |
-| Embeddings | `Qwen3-Embedding-0.6B-GGUF` | Q8_0 | ~640 MB |
-| STT (voice in) | `Whisper-Large-v3-Turbo` | default | ~1.5 GB |
-| TTS (voice out) | `Kokoro-v1`, voice `ef_dora` | default | ~80 MB |
+| Role | Model (Lemonade registry id) | Quantization | Approx. VRAM | Native mode |
+|---|---|---|---|---|
+| LLM (chat) | `Qwen3-14B-GGUF` | Q4_0 | ~8.5 GB | reasoning — disable at runtime (see F5) |
+| LLM fallback (small) | `Qwen3-4B-Instruct-2507-GGUF` | Q4_K_M | ~2.5 GB | instruct (non-thinking) |
+| Embeddings | `Qwen3-Embedding-0.6B-GGUF` | Q8_0 | ~640 MB | — |
+| STT (voice in) | `Whisper-Large-v3-Turbo` | default | ~1.5 GB | — |
+| TTS (voice out) | `kokoro-v1`, voice `ef_dora` | default | ~80 MB | — |
 
-`Qwen3-Embedding-0.6B-GGUF` is in Lemonade's default `server_models.json` registry — no custom recipe needed. Verified against `lemonade-sdk/lemonade@main` source on 2026-04-30. See [docs/decisions/v0.1-open-questions.md](docs/decisions/v0.1-open-questions.md) §OQ#1 for the full registry of bundled embedding models.
+All five models are Lemonade-managed recipes — no custom registration needed. Verified against `lemonade-sdk/lemonade@main` source `server_models.json` on 2026-05-02. The 14B chat model is Lemonade's `Qwen3-14B-GGUF` (label `reasoning`), which is the thinking-mode variant; we disable thinking per request via `chat_template_kwargs` (see F5). There is no `Qwen3-14B-Instruct-2507-GGUF` recipe in Lemonade today; the 4B fallback is the only Instruct-2507 variant currently shipped.
+
+See [docs/decisions/v0.1-open-questions.md](docs/decisions/v0.1-open-questions.md) §OQ#1 for the full registry of bundled embedding models.
 
 ---
 
@@ -228,11 +230,11 @@ Each feature has: ID, description, inputs, outputs, key behaviors, error handlin
   No insertes palabras en inglés salvo nombres propios técnicos.
   ```
 - **Model parameters (v0.1 defaults):**
-  - `model`: `Qwen3-14B-Instruct-GGUF` (or fallback `Qwen3-4B-Instruct-GGUF` if VRAM detection says <12 GB)
+  - `model`: `Qwen3-14B-GGUF` (or fallback `Qwen3-4B-Instruct-2507-GGUF` if VRAM detection says <12 GB)
   - `temperature`: 0.4
   - `max_tokens`: 1024
   - `stream`: true
-  - Thinking mode: **disabled** (Qwen3 thinking leaks `<think>` blocks; not desired for v0.1)
+  - `chat_template_kwargs`: `{ "enable_thinking": false }` — **mandatory** for `Qwen3-14B-GGUF` (the registry recipe is the thinking-mode variant). The 4B fallback is natively non-thinking but the same flag is sent for parity. Default-on thinking floods `reasoning_content` and leaves `content` empty under reasonable `max_tokens`; verified empirically 2026-05-02 on Qwen3-0.6B against Lemonade v10.x.
 - **Behaviors:**
   - Multi-turn within session: prior messages included up to a 32K context budget; older turns dropped FIFO.
   - Streaming uses Server-Sent Events parsed in the frontend. **Implementation note**: use the WebView's native `window.fetch()` for SSE — NOT `@tauri-apps/plugin-http`, which has documented streaming bugs. See [docs/decisions/v0.1-open-questions.md](docs/decisions/v0.1-open-questions.md) §OQ#6.
