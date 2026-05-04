@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Local Claude context (per workspace pattern; stays on the maintainer's machine)
+CLAUDE.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
