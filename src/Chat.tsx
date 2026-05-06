@@ -5,7 +5,14 @@ import { chatStream, pickChatModel, type ChatMessage } from "./lemonade";
 // In this slice (chat without retrieval) we drop those lines so the model
 // doesn't hallucinate references to context it never received. The full
 // SPEC prompt comes back when F4 (retrieval) is wired in.
+//
+// The "respondé SIEMPRE en español" + "no pienses en inglés" lines are
+// hardening against the documented Qwen3-family English-thinking defect
+// (arXiv 2508.10355, QwenLM/Qwen3.5#35). See
+// docs/decisions/v0.1-model-selection.md for the evidence.
 const SYSTEM_PROMPT = `Sos un asistente que responde en español rioplatense, formal y al grano.
+Respondé SIEMPRE en español, sin alternar al inglés bajo ninguna circunstancia.
+No "pienses" en inglés y traduzcas: razoná directamente en español.
 No inventes datos. No agregues frases tipo "como modelo de lenguaje" ni "as an AI".
 No insertes palabras en inglés salvo nombres propios técnicos.`;
 

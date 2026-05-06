@@ -225,16 +225,20 @@ Each feature has: ID, description, inputs, outputs, key behaviors, error handlin
 - **System prompt (Spanish, locked for v0.1):**
   ```
   Sos un asistente que responde en español rioplatense, formal y al grano.
+  Respondé SIEMPRE en español, sin alternar al inglés bajo ninguna circunstancia.
+  No "pienses" en inglés y traduzcas: razoná directamente en español.
   Usás únicamente la información de los fragmentos provistos para responder.
   Si la respuesta no está en los fragmentos, decilo explícitamente.
   No inventes datos. No agregues frases tipo "como modelo de lenguaje" ni "as an AI".
   No insertes palabras en inglés salvo nombres propios técnicos.
   ```
+  The two ES-locking lines are hardening against the documented Qwen3-family English-thinking defect (arXiv 2508.10355, QwenLM/Qwen3.5#35). Evidence and rationale: [docs/decisions/v0.1-model-selection.md](docs/decisions/v0.1-model-selection.md).
 - **Model parameters (v0.1 defaults):**
   - `model`: `Qwen3-14B-GGUF` (or fallback `Qwen3-4B-Instruct-2507-GGUF` if VRAM detection says <12 GB)
   - `temperature`: 0.4
   - `max_tokens`: 1024
   - `stream`: true
+  - `presence_penalty`: leave at API default (0.0). The Qwen3-14B model card warns that values above ~0.5 trigger language-mixing — do not raise without re-evaluating against the Spanish acceptance test (§12.3).
   - `chat_template_kwargs`: `{ "enable_thinking": false }` — **mandatory** for `Qwen3-14B-GGUF` (the registry recipe is the thinking-mode variant). The 4B fallback is natively non-thinking but the same flag is sent for parity. Default-on thinking floods `reasoning_content` and leaves `content` empty under reasonable `max_tokens`; verified empirically 2026-05-02 on Qwen3-0.6B against Lemonade v10.x.
 - **Behaviors:**
   - Multi-turn within session: prior messages included up to a 32K context budget; older turns dropped FIFO.
