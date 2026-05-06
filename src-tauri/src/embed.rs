@@ -4,8 +4,8 @@ use std::time::Instant;
 
 use crate::db::DbState;
 
-const LEMONADE_URL: &str = "http://localhost:13305/api/v1";
-const EMBED_MODEL: &str = "Qwen3-Embedding-0.6B-GGUF";
+pub const LEMONADE_URL: &str = "http://localhost:13305/api/v1";
+pub const EMBED_MODEL: &str = "Qwen3-Embedding-0.6B-GGUF";
 // SPEC §F2: 32 chunks per HTTP request to Lemonade /embeddings.
 const BATCH_SIZE: usize = 32;
 // Conservative ceiling for the slowest expected case (cold model load + a
@@ -154,6 +154,20 @@ pub fn embed_document(
         model: EMBED_MODEL.to_string(),
         elapsed_ms: started.elapsed().as_millis() as u64,
     })
+}
+
+// Embed a single string (e.g. a user question for retrieval).
+// Returns the raw Float32 vector — caller decides whether to store it,
+// reuse it, or compare against the corpus.
+pub fn embed_query(text: &str) -> Result<Vec<f32>, String> {
+    let resp = call_embeddings(&[text.to_string()])?;
+    if resp.data.len() != 1 {
+        return Err(format!(
+            "Lemonade returned {} embeddings for a single-input request",
+            resp.data.len()
+        ));
+    }
+    Ok(resp.data.into_iter().next().unwrap().embedding)
 }
 
 fn call_embeddings(inputs: &[String]) -> Result<EmbedResponse, String> {
