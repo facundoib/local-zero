@@ -31,6 +31,12 @@ fn bootstrap(conn: &Connection) -> rusqlite::Result<()> {
             text        TEXT    NOT NULL,
             token_count INTEGER NOT NULL
          );
-         CREATE INDEX IF NOT EXISTS idx_chunks_document ON chunks(document_id);",
+         CREATE INDEX IF NOT EXISTS idx_chunks_document ON chunks(document_id);
+         CREATE TABLE IF NOT EXISTS embeddings (
+            chunk_id INTEGER PRIMARY KEY REFERENCES chunks(id),
+            vector   BLOB    NOT NULL,
+            dim      INTEGER NOT NULL,
+            model    TEXT    NOT NULL
+         );",
     )
 }

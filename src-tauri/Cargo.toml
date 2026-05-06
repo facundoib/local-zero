@@ -29,4 +29,5 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 sha2 = "0.10"
 pdf-extract = "0.7"
 tiktoken-rs = "0.6"
+ureq = { version = "2.10", features = ["json"] }
 

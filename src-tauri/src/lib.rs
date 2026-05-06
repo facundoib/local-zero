@@ -1,4 +1,5 @@
 mod db;
+mod embed;
 mod ingest;
 
 use std::sync::Mutex;
@@ -19,7 +20,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             ingest::ingest_paths,
-            ingest::list_documents
+            ingest::list_documents,
+            embed::embed_document
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
