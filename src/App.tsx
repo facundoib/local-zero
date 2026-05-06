@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
+import { Chat } from "./Chat";
 import "./App.css";
 
 function isTauri(): boolean {
@@ -198,6 +199,8 @@ function App() {
           </ul>
         )}
       </section>
+
+      <Chat />
     </main>
   );
 }
