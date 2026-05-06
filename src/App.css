@@ -1,116 +1,203 @@
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafb);
-}
 :root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #1f1d1b;
+  background-color: #f6f3ee;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
 }
 
-.container {
+* {
+  box-sizing: border-box;
+}
+
+body {
   margin: 0;
-  padding-top: 10vh;
+}
+
+.app {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 24px;
+}
+
+.hero h1 {
+  margin: 0 0 4px;
+  font-size: 1.75rem;
+  letter-spacing: -0.01em;
+}
+
+.hero .hint {
+  margin: 0;
+  color: #5a5550;
+  font-size: 0.95rem;
+}
+
+.hero code {
+  background: #ece7df;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 0.85em;
+}
+
+.dropzone {
+  border: 2px dashed #c9bfae;
+  border-radius: 12px;
+  padding: 48px 16px;
   text-align: center;
+  background: #fbf9f4;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
-  display: flex;
-  justify-content: center;
-}
-
-a {
+.dropzone__label {
+  color: #5a5550;
   font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
 }
 
-a:hover {
-  color: #535bf2;
+.dropzone--over {
+  background: #f1ebde;
+  border-color: #b35936;
 }
 
-h1 {
-  text-align: center;
+.dropzone--over .dropzone__label {
+  color: #b35936;
 }
 
-input,
-button {
+.dropzone--busy {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.status {
+  margin: 0;
+  padding: 10px 14px;
   border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+  font-size: 0.92rem;
+}
+
+.status--ok {
+  background: #eaf3e8;
+  color: #2c5e2e;
+  border: 1px solid #c9deca;
+}
+
+.status--err {
+  background: #f7e9e4;
+  color: #8a3a1d;
+  border: 1px solid #e6c8bd;
+}
+
+.docs h2 {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.docs .count {
+  color: #8a857f;
+  font-weight: 400;
+}
+
+.docs ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #e5dfd2;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.doc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #efe9dc;
+}
+
+.doc-row:last-child {
+  border-bottom: none;
+}
+
+.doc-row .filename {
   font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-button {
-  cursor: pointer;
+.doc-row .meta {
+  color: #8a857f;
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-input,
-button {
-  outline: none;
-}
-
-#greet-input {
-  margin-right: 5px;
+.empty {
+  margin: 0;
+  color: #8a857f;
+  font-style: italic;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
+    color: #ede8e0;
+    background-color: #1c1a18;
   }
 
-  a:hover {
-    color: #24c8db;
+  .hero .hint,
+  .dropzone__label,
+  .doc-row .meta,
+  .docs .count,
+  .empty {
+    color: #a59c8e;
   }
 
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
+  .hero code {
+    background: #2a2724;
+    color: #ede8e0;
   }
-  button:active {
-    background-color: #0f0f0f69;
+
+  .dropzone {
+    background: #232120;
+    border-color: #3a3631;
+  }
+
+  .dropzone--over {
+    background: #2a2522;
+    border-color: #d97a52;
+  }
+
+  .dropzone--over .dropzone__label {
+    color: #d97a52;
+  }
+
+  .docs ul {
+    background: #232120;
+    border-color: #3a3631;
+  }
+
+  .doc-row {
+    border-color: #2e2b27;
+  }
+
+  .status--ok {
+    background: #1f2c1f;
+    color: #c0d8c1;
+    border-color: #2c3f2c;
+  }
+
+  .status--err {
+    background: #2e201b;
+    color: #e6b29e;
+    border-color: #4a2e23;
   }
 }
