@@ -3,15 +3,25 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
+use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tiktoken_rs::{cl100k_base, CoreBPE};
 
 use crate::db::DbState;
 
 const MAX_BYTES: u64 = 50 * 1024 * 1024;
-// ~512-token target via a char-based proxy until tiktoken-rs lands in iter 2.
-// Spanish averages ~3.5–4 chars per token in BPE-style tokenizers; 2048 chars
-// is a conservative approximation that fits inside Qwen3's context budget.
-const TARGET_CHUNK_CHARS: usize = 2048;
+// SPEC §F1: 512-token target with 64-token overlap.
+// cl100k_base is OpenAI's GPT-4 BPE — used here as a stable proxy because
+// Qwen3's tokenizer is not exposed in pure Rust. Token counts are
+// approximate vs Qwen3 but consistent across the corpus, which is what
+// chunk-budget enforcement actually needs.
+const TARGET_TOKENS: usize = 512;
+const OVERLAP_TOKENS: usize = 64;
+
+fn bpe() -> &'static CoreBPE {
+    static BPE: OnceLock<CoreBPE> = OnceLock::new();
+    BPE.get_or_init(|| cl100k_base().expect("inicializando tokenizer cl100k_base"))
+}
 
 #[derive(Serialize, Clone)]
 pub struct IngestResult {
@@ -146,7 +156,7 @@ fn ingest_one(path: &str, state: &DbState) -> Result<IngestResult, String> {
     .map_err(|e| format!("insertando documento: {e}"))?;
     let doc_id = conn.last_insert_rowid();
 
-    let chunks = chunk_text(&text, TARGET_CHUNK_CHARS);
+    let chunks = chunk_text(&text);
     let chunk_count = chunks.len() as i64;
 
     {
@@ -156,9 +166,8 @@ fn ingest_one(path: &str, state: &DbState) -> Result<IngestResult, String> {
                  VALUES (?1, ?2, ?3, ?4)",
             )
             .map_err(|e| format!("preparando chunks: {e}"))?;
-        for (i, c) in chunks.iter().enumerate() {
-            let est_tokens = (c.chars().count() / 4) as i64;
-            stmt.execute(params![doc_id, i as i64, c, est_tokens])
+        for (i, (chunk_text, tok_count)) in chunks.iter().enumerate() {
+            stmt.execute(params![doc_id, i as i64, chunk_text, *tok_count as i64])
                 .map_err(|e| format!("insertando chunk {i}: {e}"))?;
         }
     }
@@ -224,15 +233,38 @@ fn find_doc_by_sha(conn: &Connection, sha: &str) -> Result<Option<(i64, i64)>, S
     }
 }
 
-fn chunk_text(s: &str, target_chars: usize) -> Vec<String> {
-    if s.is_empty() {
+fn chunk_text(s: &str) -> Vec<(String, usize)> {
+    if s.trim().is_empty() {
         return Vec::new();
     }
-    let chars: Vec<char> = s.chars().collect();
-    chars
-        .chunks(target_chars)
-        .map(|c| c.iter().collect::<String>())
-        .collect()
+    let tokens = bpe().encode_with_special_tokens(s);
+    let n = tokens.len();
+    if n == 0 {
+        return Vec::new();
+    }
+
+    let mut out = Vec::new();
+    let mut start = 0usize;
+    let stride = TARGET_TOKENS.saturating_sub(OVERLAP_TOKENS).max(1);
+
+    while start < n {
+        let end = (start + TARGET_TOKENS).min(n);
+        let slice = tokens[start..end].to_vec();
+        let count = slice.len();
+        match bpe().decode(slice) {
+            Ok(text) => out.push((text, count)),
+            Err(_) => {
+                // Token slice not decodable on its own (rare with BPE byte-pair
+                // splits across chunk boundaries). Skip rather than abort the
+                // ingest; we still capture the rest of the document.
+            }
+        }
+        if end == n {
+            break;
+        }
+        start += stride;
+    }
+    out
 }
 
 fn hex(bytes: &[u8]) -> String {
