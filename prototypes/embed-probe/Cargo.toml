@@ -1,0 +1,15 @@
+[package]
+name = "embed-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "F2 embedding-pipeline spike — validates Lemonade /v1/embeddings contract, batching, Spanish, and latency for Local Zero"
+
+[dependencies]
+ureq = { version = "2.10", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = false
