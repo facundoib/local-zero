@@ -1,0 +1,93 @@
+name: ingest-probe (F1 spike validation)
+
+# Validates the two unknowns left open by the local F1 spike that SAC blocked
+# from running on the maintainer's machine (see docs/decisions/v0.1-f1-spike.md):
+#   1. rusqlite (bundled) builds, links, and the in-memory round-trip works.
+#   2. pdf-extract preserves Spanish characters on a real PDF input.
+#
+# A Spanish-language PDF is generated inline with fpdf2 so no fixture binary
+# needs to be committed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'prototypes/ingest-probe/**'
+      - '.github/workflows/ingest-probe.yml'
+  pull_request:
+    paths:
+      - 'prototypes/ingest-probe/**'
+      - '.github/workflows/ingest-probe.yml'
+  workflow_dispatch: {}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            prototypes/ingest-probe/target
+          key: ${{ runner.os }}-ingest-probe-${{ hashFiles('prototypes/ingest-probe/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-ingest-probe-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install fpdf2
+        run: pip install fpdf2
+
+      - name: Generate Spanish-language test PDF
+        shell: bash
+        run: |
+          python - <<'PY'
+          from fpdf import FPDF
+          pdf = FPDF()
+          pdf.add_page()
+          pdf.add_font('dejavu', fname='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')
+          pdf.set_font('dejavu', size=14)
+          lines = [
+              'Curriculum Vitae - Maria Perez',
+              'Educacion: Ingenieria en sistemas con enfasis en algoritmos.',
+              'Linea con acentos: anio, nino, corazon, manana, sueno.',
+              'Caracteres clave: ñ á é í ó ú ü ¿ ¡ Ñ Á É Í Ó Ú',
+              'Frase: ¿Cuál es tu año de graduación? ¡Sí! María vive en España.',
+              'Experiencia: diseño de algoritmos, gestión de equipos pequeños.',
+          ]
+          for line in lines:
+              pdf.cell(text=line, new_x='LMARGIN', new_y='NEXT', h=10)
+          pdf.output('prototypes/ingest-probe/test-es.pdf')
+          PY
+          ls -lh prototypes/ingest-probe/test-es.pdf
+
+      - name: Build ingest-probe (release)
+        working-directory: prototypes/ingest-probe
+        run: cargo build --release
+
+      - name: Run ingest-probe against generated Spanish PDF
+        working-directory: prototypes/ingest-probe
+        run: ./target/release/ingest-probe ./test-es.pdf
+
+      - name: Upload generated PDF on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ingest-probe-failure-artifacts
+          path: |
+            prototypes/ingest-probe/test-es.pdf
+            prototypes/ingest-probe/target/release/ingest-probe
+          if-no-files-found: ignore
+          retention-days: 7

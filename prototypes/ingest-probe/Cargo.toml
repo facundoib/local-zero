@@ -1,0 +1,15 @@
+[package]
+name = "ingest-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "F1 ingestion spike — validates rusqlite (bundled) + pdf-extract under SAC for Local Zero"
+
+[dependencies]
+rusqlite = { version = "0.32", features = ["bundled"] }
+pdf-extract = "0.7"
+sha2 = "0.10"
+
+[profile.release]
+opt-level = 3
+lto = false
