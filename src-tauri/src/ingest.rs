@@ -175,6 +175,7 @@ fn ingest_one(path: &str, state: &DbState) -> Result<IngestResult, String> {
 fn mime_for_ext(ext: &str) -> Option<&'static str> {
     match ext {
         "txt" => Some("text/plain"),
+        "md" => Some("text/markdown"),
         "pdf" => Some("application/pdf"),
         _ => None,
     }
@@ -184,7 +185,7 @@ const MIN_PDF_TEXT_CHARS: usize = 100;
 
 fn extract_text(ext: &str, bytes: &[u8]) -> Result<String, String> {
     match ext {
-        "txt" => String::from_utf8(bytes.to_vec())
+        "txt" | "md" => String::from_utf8(bytes.to_vec())
             .map_err(|_| "el archivo no es UTF-8 válido".to_string()),
         "pdf" => {
             let text = pdf_extract::extract_text_from_mem(bytes)

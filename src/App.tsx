@@ -113,8 +113,8 @@ function App() {
       <header className="hero">
         <h1>Local Zero</h1>
         <p className="hint">
-          Arrastrá archivos <code>.txt</code> o <code>.pdf</code> a la zona de abajo
-          para ingresarlos. MD llega en la próxima iteración.
+          Arrastrá archivos <code>.txt</code>, <code>.md</code> o <code>.pdf</code>{" "}
+          a la zona de abajo para ingresarlos.
         </p>
       </header>
 
@@ -128,7 +128,7 @@ function App() {
             ? "Procesando…"
             : dragOver
               ? "Soltá para ingresar"
-              : "Arrastrá un archivo .txt o .pdf acá"}
+              : "Arrastrá un archivo .txt, .md o .pdf acá"}
         </span>
       </section>
 
