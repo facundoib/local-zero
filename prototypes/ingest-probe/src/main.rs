@@ -98,9 +98,9 @@ fn probe_sqlite() -> rusqlite::Result<()> {
          );",
     )?;
 
-    let sample = b"Hola mundo, esto es una prueba con eñes y acentos: año, niño, corazón.";
+    let sample = "Hola mundo, esto es una prueba con eñes y acentos: año, niño, corazón.";
     let mut hasher = Sha256::new();
-    hasher.update(sample);
+    hasher.update(sample.as_bytes());
     let sha = hex(&hasher.finalize());
 
     conn.execute(
@@ -114,7 +114,7 @@ fn probe_sqlite() -> rusqlite::Result<()> {
         |row| row.get(0),
     )?;
 
-    let chunks = chunk_text(std::str::from_utf8(sample).unwrap(), 8);
+    let chunks = chunk_text(sample, 8);
     let mut stmt = conn.prepare(
         "INSERT INTO chunks (document_id, ordinal, text, token_count) VALUES (?1, ?2, ?3, ?4)",
     )?;
