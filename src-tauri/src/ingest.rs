@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
 use std::sync::OnceLock;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tiktoken_rs::{cl100k_base, CoreBPE};
 
 use crate::db::DbState;
@@ -30,6 +30,7 @@ pub struct IngestResult {
     pub byte_size: i64,
     pub chunk_count: i64,
     pub deduped: bool,
+    pub elapsed_ms: u64,
 }
 
 #[derive(Serialize, Clone)]
@@ -91,6 +92,7 @@ pub fn list_documents(state: tauri::State<DbState>) -> Result<Vec<DocumentRow>, 
 }
 
 fn ingest_one(path: &str, state: &DbState) -> Result<IngestResult, String> {
+    let started = Instant::now();
     let p = Path::new(path);
     let filename = p
         .file_name()
@@ -138,6 +140,7 @@ fn ingest_one(path: &str, state: &DbState) -> Result<IngestResult, String> {
             byte_size: byte_size as i64,
             chunk_count,
             deduped: true,
+            elapsed_ms: started.elapsed().as_millis() as u64,
         });
     }
 
@@ -178,6 +181,7 @@ fn ingest_one(path: &str, state: &DbState) -> Result<IngestResult, String> {
         byte_size: byte_size as i64,
         chunk_count,
         deduped: false,
+        elapsed_ms: started.elapsed().as_millis() as u64,
     })
 }
 

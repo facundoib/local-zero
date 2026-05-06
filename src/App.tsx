@@ -25,6 +25,7 @@ interface IngestResult {
   byte_size: number;
   chunk_count: number;
   deduped: boolean;
+  elapsed_ms: number;
 }
 
 function App() {
@@ -72,10 +73,11 @@ function App() {
       const parts: string[] = [];
       if (fresh.length > 0) {
         const totalChunks = fresh.reduce((s, r) => s + r.chunk_count, 0);
+        const totalMs = fresh.reduce((s, r) => s + r.elapsed_ms, 0);
         parts.push(
           `${fresh.length} archivo${fresh.length === 1 ? "" : "s"} ingresado${
             fresh.length === 1 ? "" : "s"
-          } (${totalChunks} chunks)`,
+          } (${totalChunks} chunks · ${formatElapsed(totalMs)})`,
         );
       }
       if (dup.length > 0) {
@@ -102,7 +104,14 @@ function App() {
 
     refresh();
 
+    // The listener registration is async; React.StrictMode in dev runs
+    // mount → cleanup → mount, so cleanup may fire before the .then()
+    // resolves. Track activity with a flag so a late-arriving unlisten
+    // function is invoked immediately rather than being abandoned, which
+    // would leave a duplicate listener and double-fire every drop.
+    let active = true;
     let unlisten: (() => void) | undefined;
+
     getCurrentWebview()
       .onDragDropEvent((event) => {
         if (event.payload.type === "enter" || event.payload.type === "over") {
@@ -115,13 +124,18 @@ function App() {
         }
       })
       .then((u) => {
-        unlisten = u;
+        if (!active) {
+          u();
+        } else {
+          unlisten = u;
+        }
       })
       .catch((e) => {
         setError(`No pude registrar el listener de drag&drop: ${String(e)}`);
       });
 
     return () => {
+      active = false;
       if (unlisten) unlisten();
     };
   }, []);
@@ -192,6 +206,11 @@ function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatElapsed(ms: number): string {
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(2)} s`;
 }
 
 function formatRelative(unixSecs: number): string {
