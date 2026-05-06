@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { open } from "@tauri-apps/plugin-dialog";
 import "./App.css";
 
 function isTauri(): boolean {
@@ -39,6 +40,23 @@ function App() {
       setDocs(list);
     } catch (e) {
       setError(`No pude leer la lista de documentos: ${String(e)}`);
+    }
+  }
+
+  async function handlePickFiles() {
+    if (!isTauri()) return;
+    try {
+      const selection = await open({
+        multiple: true,
+        filters: [
+          { name: "Documentos", extensions: ["txt", "md", "pdf"] },
+        ],
+      });
+      if (selection === null) return;
+      const paths = Array.isArray(selection) ? selection : [selection];
+      await handleDrop(paths);
+    } catch (e) {
+      setError(`No pude abrir el selector: ${String(e)}`);
     }
   }
 
@@ -130,6 +148,15 @@ function App() {
               ? "Soltá para ingresar"
               : "Arrastrá un archivo .txt, .md o .pdf acá"}
         </span>
+        {!busy && !dragOver && (
+          <button
+            type="button"
+            className="dropzone__picker"
+            onClick={handlePickFiles}
+          >
+            o elegí archivos…
+          </button>
+        )}
       </section>
 
       {lastResult && <p className="status status--ok">{lastResult}</p>}
