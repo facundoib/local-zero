@@ -104,15 +104,11 @@ fn ingest_one(path: &str, state: &DbState) -> Result<IngestResult, String> {
         .map(|s| s.to_ascii_lowercase())
         .unwrap_or_default();
 
-    if ext != "txt" {
-        return Err(format!(
-            "formato '.{ext}' no soportado en esta iteración (sólo .txt)"
-        ));
-    }
+    let mime = mime_for_ext(&ext)
+        .ok_or_else(|| format!("formato '.{ext}' no soportado en esta iteración"))?;
 
     let bytes = fs::read(p).map_err(|e| format!("error leyendo el archivo: {e}"))?;
-    let text = String::from_utf8(bytes.clone())
-        .map_err(|_| "el archivo no es UTF-8 válido".to_string())?;
+    let text = extract_text(&ext, &bytes)?;
 
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
@@ -141,7 +137,7 @@ fn ingest_one(path: &str, state: &DbState) -> Result<IngestResult, String> {
         params![
             filename,
             path,
-            "text/plain",
+            mime,
             byte_size as i64,
             sha,
             now
@@ -174,6 +170,35 @@ fn ingest_one(path: &str, state: &DbState) -> Result<IngestResult, String> {
         chunk_count,
         deduped: false,
     })
+}
+
+fn mime_for_ext(ext: &str) -> Option<&'static str> {
+    match ext {
+        "txt" => Some("text/plain"),
+        "pdf" => Some("application/pdf"),
+        _ => None,
+    }
+}
+
+const MIN_PDF_TEXT_CHARS: usize = 100;
+
+fn extract_text(ext: &str, bytes: &[u8]) -> Result<String, String> {
+    match ext {
+        "txt" => String::from_utf8(bytes.to_vec())
+            .map_err(|_| "el archivo no es UTF-8 válido".to_string()),
+        "pdf" => {
+            let text = pdf_extract::extract_text_from_mem(bytes)
+                .map_err(|e| format!("no pude leer el PDF: {e}"))?;
+            if text.trim().chars().count() < MIN_PDF_TEXT_CHARS {
+                return Err(
+                    "el PDF parece ser una imagen escaneada (poco o ningún texto extraído). \
+                     Esta versión no soporta OCR.".to_string(),
+                );
+            }
+            Ok(text)
+        }
+        _ => Err(format!("formato '.{ext}' no soportado")),
+    }
 }
 
 fn find_doc_by_sha(conn: &Connection, sha: &str) -> Result<Option<(i64, i64)>, String> {
