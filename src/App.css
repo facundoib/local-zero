@@ -226,6 +226,12 @@ body {
   color: #8a857f;
 }
 
+.chat__retrieval {
+  font-size: 0.72rem;
+  color: #8a857f;
+  margin-top: -2px;
+}
+
 .chat__content {
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -370,6 +376,7 @@ body {
 
   .chat__model,
   .chat__role,
+  .chat__retrieval,
   .chat__empty {
     color: #a59c8e;
   }
