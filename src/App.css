@@ -46,6 +46,47 @@ body {
   font-size: 0.85em;
 }
 
+.lemonade-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  background: #fbeee5;
+  border: 1px solid #e6c3a3;
+  color: #6e3a1c;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+}
+
+.lemonade-banner__msg {
+  flex: 1;
+}
+
+.lemonade-banner code {
+  background: #ece7df;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 0.85em;
+}
+
+.lemonade-banner__retry {
+  background: #b25b3c;
+  color: #fbf9f4;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.lemonade-banner__retry:hover {
+  background: #9a4d31;
+}
+
 .dropzone {
   display: flex;
   flex-direction: column;
@@ -331,6 +372,26 @@ body {
   .hero code {
     background: #2a2724;
     color: #ede8e0;
+  }
+
+  .lemonade-banner {
+    background: #2e2018;
+    border-color: #6e3a1c;
+    color: #f0c4a4;
+  }
+
+  .lemonade-banner code {
+    background: #1c1a18;
+    color: #ede8e0;
+  }
+
+  .lemonade-banner__retry {
+    background: #b25b3c;
+    color: #fbf9f4;
+  }
+
+  .lemonade-banner__retry:hover {
+    background: #d97a55;
   }
 
   .dropzone {

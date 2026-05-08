@@ -37,6 +37,18 @@ interface EmbedProgress {
   total: number;
 }
 
+// Mirror of embed.rs LEMONADE_URL / EMBED_MODEL. Hardcoded here rather
+// than imported from lemonade.ts to keep this health probe independent
+// of the chat client's caching state.
+const LEMONADE_HEALTH_URL = "http://localhost:13305/api/v1/models";
+const REQUIRED_EMBED_MODEL = "Qwen3-Embedding-0.6B-GGUF";
+
+type LemonadeHealth =
+  | { kind: "checking" }
+  | { kind: "ok" }
+  | { kind: "down" }
+  | { kind: "embed-missing" };
+
 function App() {
   const [docs, setDocs] = useState<DocumentRow[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -50,6 +62,25 @@ function App() {
   const [embedProgress, setEmbedProgress] = useState<
     Record<number, { done: number; total: number }>
   >({});
+  const [health, setHealth] = useState<LemonadeHealth>({ kind: "checking" });
+
+  async function checkLemonadeHealth() {
+    setHealth({ kind: "checking" });
+    try {
+      const resp = await fetch(LEMONADE_HEALTH_URL);
+      if (!resp.ok) {
+        setHealth({ kind: "down" });
+        return;
+      }
+      const json = (await resp.json()) as { data?: { id: string }[] };
+      const has = (json.data ?? []).some((m) => m.id === REQUIRED_EMBED_MODEL);
+      setHealth({ kind: has ? "ok" : "embed-missing" });
+    } catch {
+      // fetch throws on TypeError network failure (server not running,
+      // DNS, etc). HTTP non-200 doesn't throw — that's handled above.
+      setHealth({ kind: "down" });
+    }
+  }
 
   async function refresh() {
     try {
@@ -119,6 +150,7 @@ function App() {
     }
 
     refresh();
+    checkLemonadeHealth();
 
     // The listener registration is async; React.StrictMode in dev runs
     // mount → cleanup → mount, so cleanup may fire before the .then()
@@ -190,6 +222,33 @@ function App() {
           a la zona de abajo para ingresarlos.
         </p>
       </header>
+
+      {(health.kind === "down" || health.kind === "embed-missing") && (
+        <div className="lemonade-banner" role="alert">
+          <span className="lemonade-banner__msg">
+            {health.kind === "down" ? (
+              <>
+                Lemonade Server no responde en <code>localhost:13305</code>.
+                Iniciá el server (menú Inicio → Lemonade, o{" "}
+                <code>LemonadeServer.exe</code> en una terminal) y reintentá.
+              </>
+            ) : (
+              <>
+                Falta el modelo de embeddings <code>{REQUIRED_EMBED_MODEL}</code>{" "}
+                en Lemonade. Ejecutá:{" "}
+                <code>lemonade pull {REQUIRED_EMBED_MODEL}</code>
+              </>
+            )}
+          </span>
+          <button
+            type="button"
+            className="lemonade-banner__retry"
+            onClick={checkLemonadeHealth}
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
 
       <section
         className={`dropzone ${dragOver ? "dropzone--over" : ""} ${
