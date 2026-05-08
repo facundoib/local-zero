@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Chat } from "./Chat";
@@ -17,6 +18,7 @@ interface DocumentRow {
   filename: string;
   byte_size: number;
   chunk_count: number;
+  embedded_count: number;
   ingested_at: number;
 }
 
@@ -29,12 +31,25 @@ interface IngestResult {
   elapsed_ms: number;
 }
 
+interface EmbedProgress {
+  doc_id: number;
+  done: number;
+  total: number;
+}
+
 function App() {
   const [docs, setDocs] = useState<DocumentRow[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
+  // Live override of embedded_count while a background embed is in
+  // flight. The persisted column from list_documents is the
+  // authoritative source after completion; this keeps UI snappy without
+  // re-querying every batch.
+  const [embedProgress, setEmbedProgress] = useState<
+    Record<number, { done: number; total: number }>
+  >({});
 
   async function refresh() {
     try {
@@ -111,7 +126,8 @@ function App() {
     // function is invoked immediately rather than being abandoned, which
     // would leave a duplicate listener and double-fire every drop.
     let active = true;
-    let unlisten: (() => void) | undefined;
+    let unlistenDrop: (() => void) | undefined;
+    let unlistenEmbed: (() => void) | undefined;
 
     getCurrentWebview()
       .onDragDropEvent((event) => {
@@ -128,16 +144,40 @@ function App() {
         if (!active) {
           u();
         } else {
-          unlisten = u;
+          unlistenDrop = u;
         }
       })
       .catch((e) => {
         setError(`No pude registrar el listener de drag&drop: ${String(e)}`);
       });
 
+    listen<EmbedProgress>("embed-progress", (event) => {
+      const { doc_id, done, total } = event.payload;
+      setEmbedProgress((prev) => ({ ...prev, [doc_id]: { done, total } }));
+      // On completion, re-query list_documents so the authoritative
+      // embedded_count column reflects the persisted state. The live
+      // override stays in place until the refresh resolves; once docs
+      // are refetched, embedded_count == chunk_count and the UI hides
+      // the "embedding…" hint regardless of the override.
+      if (done >= total) {
+        refresh();
+      }
+    })
+      .then((u) => {
+        if (!active) {
+          u();
+        } else {
+          unlistenEmbed = u;
+        }
+      })
+      .catch((e) => {
+        setError(`No pude registrar el listener de embed-progress: ${String(e)}`);
+      });
+
     return () => {
       active = false;
-      if (unlisten) unlisten();
+      unlistenDrop?.();
+      unlistenEmbed?.();
     };
   }, []);
 
@@ -185,17 +225,31 @@ function App() {
           <p className="empty">Aún no ingresaste ningún documento.</p>
         ) : (
           <ul>
-            {docs.map((d) => (
-              <li key={d.id} className="doc-row">
-                <span className="filename" title={d.filename}>
-                  {d.filename}
-                </span>
-                <span className="meta">
-                  {d.chunk_count} chunks · {formatBytes(d.byte_size)} ·{" "}
-                  {formatRelative(d.ingested_at)}
-                </span>
-              </li>
-            ))}
+            {docs.map((d) => {
+              const live = embedProgress[d.id];
+              const done = live?.done ?? d.embedded_count;
+              const total = d.chunk_count;
+              const embedding = total > 0 && done < total;
+              return (
+                <li key={d.id} className="doc-row">
+                  <span className="filename" title={d.filename}>
+                    {d.filename}
+                  </span>
+                  <span className="meta">
+                    {d.chunk_count} chunks · {formatBytes(d.byte_size)} ·{" "}
+                    {formatRelative(d.ingested_at)}
+                    {embedding && (
+                      <>
+                        {" · "}
+                        <span className="meta__embed">
+                          embedding {done}/{total}…
+                        </span>
+                      </>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

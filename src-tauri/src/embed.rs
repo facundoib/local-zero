@@ -2,8 +2,16 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+use tauri::{AppHandle, Emitter};
 
 use crate::db::DbState;
+
+#[derive(Serialize, Clone)]
+pub struct EmbedProgress {
+    pub doc_id: i64,
+    pub done: usize,
+    pub total: usize,
+}
 
 pub const LEMONADE_URL: &str = "http://localhost:13305/api/v1";
 pub const EMBED_MODEL: &str = "Qwen3-Embedding-0.6B-GGUF";
@@ -43,10 +51,11 @@ struct EmbedItem {
 
 #[tauri::command]
 pub fn embed_document(
+    app: AppHandle,
     doc_id: i64,
     state: tauri::State<DbState>,
 ) -> Result<EmbedResult, String> {
-    embed_document_impl(doc_id, state.0.clone())
+    embed_document_impl(app, doc_id, state.0.clone())
 }
 
 // Implementation that doesn't borrow from `tauri::State`, so it can be
@@ -54,7 +63,13 @@ pub fn embed_document(
 // new ingest in ingest_paths). The Arc clone is the wedge: the task
 // owns its own reference to the same Mutex<Connection> without holding
 // a Tauri framework borrow across the multi-second HTTP loop.
+//
+// `embed-progress` events are emitted on the AppHandle once per batch
+// (post-insert) so the frontend can render per-doc progress without
+// polling list_documents. A final event with `done == total` doubles
+// as the completion signal so the UI can flip to "embedded" state.
 pub fn embed_document_impl(
+    app: AppHandle,
     doc_id: i64,
     db: Arc<Mutex<Connection>>,
 ) -> Result<EmbedResult, String> {
@@ -96,7 +111,20 @@ pub fn embed_document_impl(
         (out, already)
     };
 
+    let total = (pending.len() as i64 + already) as usize;
+
     if pending.is_empty() {
+        // Doc is already fully embedded: emit a synthetic done==total
+        // event so a UI watching for completion (e.g. after a re-mount
+        // or page reload) doesn't get stuck on a stale partial state.
+        let _ = app.emit(
+            "embed-progress",
+            EmbedProgress {
+                doc_id,
+                done: total,
+                total,
+            },
+        );
         return Ok(EmbedResult {
             doc_id,
             embedded: 0,
@@ -106,6 +134,17 @@ pub fn embed_document_impl(
             elapsed_ms: started.elapsed().as_millis() as u64,
         });
     }
+
+    // Initial 0/N event so the UI can flip to "embedding…" state as
+    // soon as the spawn lands, before the first batch round-trips.
+    let _ = app.emit(
+        "embed-progress",
+        EmbedProgress {
+            doc_id,
+            done: already as usize,
+            total,
+        },
+    );
 
     let mut total_dim: usize = 0;
     let mut embedded: i64 = 0;
@@ -157,6 +196,16 @@ pub fn embed_document_impl(
                 .map_err(|e| format!("inserting embedding for chunk {chunk_id}: {e}"))?;
             embedded += 1;
         }
+        drop(stmt);
+        drop(conn);
+        let _ = app.emit(
+            "embed-progress",
+            EmbedProgress {
+                doc_id,
+                done: (already + embedded) as usize,
+                total,
+            },
+        );
     }
 
     Ok(EmbedResult {

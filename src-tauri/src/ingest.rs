@@ -39,11 +39,13 @@ pub struct DocumentRow {
     pub filename: String,
     pub byte_size: i64,
     pub chunk_count: i64,
+    pub embedded_count: i64,
     pub ingested_at: i64,
 }
 
 #[tauri::command]
 pub fn ingest_paths(
+    app: tauri::AppHandle,
     paths: Vec<String>,
     state: tauri::State<DbState>,
 ) -> Result<Vec<IngestResult>, String> {
@@ -57,14 +59,15 @@ pub fn ingest_paths(
                 // 32 chunks at a time + cold-load latency on first call),
                 // and we want ingest_paths to return as soon as the rows
                 // are in the DB so the UI can render the new doc in the
-                // left rail without waiting. Errors get logged to stderr
-                // and silently dropped here; slice 2 of issue #1 wires
-                // them through proper Tauri events for UI surfacing.
+                // left rail without waiting. The spawned task emits
+                // `embed-progress` events on `app` per batch so the UI
+                // can render per-doc progress without polling.
                 if !r.deduped {
                     let db = state.0.clone();
+                    let app_clone = app.clone();
                     let doc_id = r.id;
                     std::thread::spawn(move || {
-                        if let Err(e) = crate::embed::embed_document_impl(doc_id, db) {
+                        if let Err(e) = crate::embed::embed_document_impl(app_clone, doc_id, db) {
                             eprintln!("auto-embed doc {doc_id}: {e}");
                         }
                     });
@@ -85,10 +88,12 @@ pub fn list_documents(state: tauri::State<DbState>) -> Result<Vec<DocumentRow>, 
             "SELECT documents.id,
                     documents.filename,
                     documents.byte_size,
-                    COUNT(chunks.id) AS chunk_count,
+                    COUNT(DISTINCT chunks.id)     AS chunk_count,
+                    COUNT(DISTINCT embeddings.chunk_id) AS embedded_count,
                     documents.ingested_at
              FROM documents
-             LEFT JOIN chunks ON chunks.document_id = documents.id
+             LEFT JOIN chunks     ON chunks.document_id = documents.id
+             LEFT JOIN embeddings ON embeddings.chunk_id = chunks.id
              GROUP BY documents.id
              ORDER BY documents.ingested_at DESC",
         )
@@ -100,7 +105,8 @@ pub fn list_documents(state: tauri::State<DbState>) -> Result<Vec<DocumentRow>, 
                 filename: row.get(1)?,
                 byte_size: row.get(2)?,
                 chunk_count: row.get(3)?,
-                ingested_at: row.get(4)?,
+                embedded_count: row.get(4)?,
+                ingested_at: row.get(5)?,
             })
         })
         .map_err(|e| format!("query list: {e}"))?;

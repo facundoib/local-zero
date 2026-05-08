@@ -162,6 +162,11 @@ body {
   white-space: nowrap;
 }
 
+.doc-row .meta__embed {
+  color: #b25b3c;
+  font-style: italic;
+}
+
 .empty {
   margin: 0;
   color: #8a857f;
@@ -317,6 +322,10 @@ body {
   .docs .count,
   .empty {
     color: #a59c8e;
+  }
+
+  .doc-row .meta__embed {
+    color: #d97a55;
   }
 
   .hero code {
