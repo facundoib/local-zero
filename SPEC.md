@@ -84,13 +84,13 @@ It uses Lemonade SDK as the local LLM backend via its OpenAI-compatible HTTP API
 ### 5.3 Default models (auto-downloaded by Lemonade on first run)
 | Role | Model (Lemonade registry id) | Quantization | Approx. VRAM | Native mode |
 |---|---|---|---|---|
-| LLM (chat) | `Qwen3-14B-GGUF` | Q4_0 | ~8.5 GB | reasoning — disable at runtime (see F5) |
-| LLM fallback (small) | `Qwen3-4B-Instruct-2507-GGUF` | Q4_K_M | ~2.5 GB | instruct (non-thinking) |
+| LLM (chat) | `Qwen3-4B-Instruct-2507-GGUF` | Q4_K_M | ~2.5 GB | instruct (non-thinking) |
+| LLM (chat, opt-in upgrade) | `Qwen3-14B-GGUF` | Q4_0 | ~8.5 GB | reasoning — currently unstable on Lemonade, see F5 |
 | Embeddings | `Qwen3-Embedding-0.6B-GGUF` | Q8_0 | ~640 MB | — |
 | STT (voice in) | `Whisper-Large-v3-Turbo` | default | ~1.5 GB | — |
 | TTS (voice out) | `kokoro-v1`, voice `ef_dora` | default | ~80 MB | — |
 
-All five models are Lemonade-managed recipes — no custom registration needed. Verified against `lemonade-sdk/lemonade@main` source `server_models.json` on 2026-05-02. The 14B chat model is Lemonade's `Qwen3-14B-GGUF` (label `reasoning`), which is the thinking-mode variant; we disable thinking per request via `chat_template_kwargs` (see F5). There is no `Qwen3-14B-Instruct-2507-GGUF` recipe in Lemonade today; the 4B fallback is the only Instruct-2507 variant currently shipped.
+All five models are Lemonade-managed recipes — no custom registration needed. Verified against `lemonade-sdk/lemonade@main` source `server_models.json` on 2026-05-02. **Default chat model swapped from `Qwen3-14B-GGUF` to `Qwen3-4B-Instruct-2507-GGUF` on 2026-05-08** after empirical evidence that the 14B reasoning variant collapses into garbage tokens on every prompt under Lemonade v10.3.0 even with `enable_thinking:false` set on the request — including 2-token sanity checks. The 4B-Instruct-2507 produces clean Spanish RAG answers in ≤20 s on the same stack. Full evidence and re-evaluation thresholds: [docs/decisions/v0.1-model-selection.md](docs/decisions/v0.1-model-selection.md). The 14B remains in `PREFERRED_CHAT_MODELS` as a second preference so that when Lemonade fixes its reasoning-template handling, the upgrade path is `lemonade pull Qwen3-14B-GGUF` with no code change.
 
 See [docs/decisions/v0.1-open-questions.md](docs/decisions/v0.1-open-questions.md) §OQ#1 for the full registry of bundled embedding models.
 
@@ -234,12 +234,12 @@ Each feature has: ID, description, inputs, outputs, key behaviors, error handlin
   ```
   The two ES-locking lines are hardening against the documented Qwen3-family English-thinking defect (arXiv 2508.10355, QwenLM/Qwen3.5#35). Evidence and rationale: [docs/decisions/v0.1-model-selection.md](docs/decisions/v0.1-model-selection.md).
 - **Model parameters (v0.1 defaults):**
-  - `model`: `Qwen3-14B-GGUF` (or fallback `Qwen3-4B-Instruct-2507-GGUF` if VRAM detection says <12 GB)
+  - `model`: `Qwen3-4B-Instruct-2507-GGUF` (primary; `Qwen3-14B-GGUF` is opt-in only, currently unstable — see §5.3 and the [model selection decision doc](docs/decisions/v0.1-model-selection.md)).
   - `temperature`: 0.4
   - `max_tokens`: 1024
   - `stream`: true
-  - `presence_penalty`: leave at API default (0.0). The Qwen3-14B model card warns that values above ~0.5 trigger language-mixing — do not raise without re-evaluating against the Spanish acceptance test (§12.3).
-  - `chat_template_kwargs`: `{ "enable_thinking": false }` — **mandatory** for `Qwen3-14B-GGUF` (the registry recipe is the thinking-mode variant). The 4B fallback is natively non-thinking but the same flag is sent for parity. Default-on thinking floods `reasoning_content` and leaves `content` empty under reasonable `max_tokens`; verified empirically 2026-05-02 on Qwen3-0.6B against Lemonade v10.x.
+  - `presence_penalty`: leave at API default (0.0). The Qwen3 model cards warn that values above ~0.5 trigger language-mixing — do not raise without re-evaluating against the Spanish acceptance test (§12.3).
+  - `chat_template_kwargs`: `{ "enable_thinking": false }` — sent on every request. The 4B-Instruct-2507 default is natively non-thinking and the flag is a no-op for it; we keep sending it so the request shape stays valid for the opt-in 14B path (which is the reasoning variant) without per-model branching in the client.
 - **Behaviors:**
   - Multi-turn within session: prior messages included up to a 32K context budget; older turns dropped FIFO.
   - Streaming uses Server-Sent Events parsed in the frontend. **Implementation note**: use the WebView's native `window.fetch()` for SSE — NOT `@tauri-apps/plugin-http`, which has documented streaming bugs. See [docs/decisions/v0.1-open-questions.md](docs/decisions/v0.1-open-questions.md) §OQ#6.

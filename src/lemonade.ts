@@ -18,10 +18,14 @@ interface ModelsResponse {
   data: ModelEntry[];
 }
 
-// SPEC §5.3 default; if not loaded we fall back to whatever chat model
-// Lemonade reports. The 14B is a 8.5 GB download and may not be present
-// on a fresh dev machine.
-const PREFERRED_CHAT_MODELS = ["Qwen3-14B-GGUF", "Qwen3-4B-Instruct-2507-GGUF"];
+// SPEC §5.3 default order. The 4B-Instruct-2507 is primary because
+// Qwen3-14B-GGUF (the registry recipe is the reasoning variant) was
+// observed to collapse into garbage tokens on every prompt — including
+// 2-token sanity checks — even with `enable_thinking:false` set on the
+// request. Evidence: docs/decisions/v0.1-model-selection.md, 2026-05-08
+// re-open. The 14B stays in the list as opt-in for future work; if
+// Lemonade fixes the reasoning template propagation it gets re-evaluated.
+const PREFERRED_CHAT_MODELS = ["Qwen3-4B-Instruct-2507-GGUF", "Qwen3-14B-GGUF"];
 
 const NON_CHAT_LABELS = new Set(["embeddings", "audio", "transcription", "tts"]);
 
