@@ -50,7 +50,27 @@ pub fn ingest_paths(
     let mut out = Vec::with_capacity(paths.len());
     for p in paths {
         match ingest_one(&p, &state) {
-            Ok(r) => out.push(r),
+            Ok(r) => {
+                // Auto-embed every newly ingested doc on a background
+                // thread. The synchronous embed_document_impl path takes
+                // multiple seconds per doc (Lemonade /embeddings batched
+                // 32 chunks at a time + cold-load latency on first call),
+                // and we want ingest_paths to return as soon as the rows
+                // are in the DB so the UI can render the new doc in the
+                // left rail without waiting. Errors get logged to stderr
+                // and silently dropped here; slice 2 of issue #1 wires
+                // them through proper Tauri events for UI surfacing.
+                if !r.deduped {
+                    let db = state.0.clone();
+                    let doc_id = r.id;
+                    std::thread::spawn(move || {
+                        if let Err(e) = crate::embed::embed_document_impl(doc_id, db) {
+                            eprintln!("auto-embed doc {doc_id}: {e}");
+                        }
+                    });
+                }
+                out.push(r);
+            }
             Err(e) => return Err(format!("{p}: {e}")),
         }
     }

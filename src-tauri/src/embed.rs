@@ -1,5 +1,6 @@
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::db::DbState;
@@ -45,12 +46,24 @@ pub fn embed_document(
     doc_id: i64,
     state: tauri::State<DbState>,
 ) -> Result<EmbedResult, String> {
+    embed_document_impl(doc_id, state.0.clone())
+}
+
+// Implementation that doesn't borrow from `tauri::State`, so it can be
+// driven from a background thread (e.g. the auto-embed spawn after a
+// new ingest in ingest_paths). The Arc clone is the wedge: the task
+// owns its own reference to the same Mutex<Connection> without holding
+// a Tauri framework borrow across the multi-second HTTP loop.
+pub fn embed_document_impl(
+    doc_id: i64,
+    db: Arc<Mutex<Connection>>,
+) -> Result<EmbedResult, String> {
     let started = Instant::now();
 
     // Step 1: snapshot pending chunks under the lock, then drop it so the
     // multi-second HTTP calls don't block other DB consumers.
     let (pending, already) = {
-        let conn = state.0.lock().map_err(|e| format!("db lock: {e}"))?;
+        let conn = db.lock().map_err(|e| format!("db lock: {e}"))?;
         let already: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM embeddings
@@ -111,7 +124,7 @@ pub fn embed_document(
 
         // Re-acquire the lock per batch to insert. Holding across the HTTP
         // call would freeze the UI on /list_documents and friends.
-        let conn = state.0.lock().map_err(|e| format!("db lock: {e}"))?;
+        let conn = db.lock().map_err(|e| format!("db lock: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "INSERT INTO embeddings (chunk_id, vector, dim, model)

@@ -3,7 +3,7 @@ mod embed;
 mod ingest;
 mod retrieval;
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -16,7 +16,7 @@ pub fn run() {
             let db_path = app_data.join("local-zero.db");
             let conn = db::open(&db_path)
                 .map_err(|e| format!("inicializando base de datos: {e}"))?;
-            app.manage(db::DbState(Mutex::new(conn)));
+            app.manage(db::DbState(Arc::new(Mutex::new(conn))));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

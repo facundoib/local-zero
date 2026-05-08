@@ -1,8 +1,11 @@
 use rusqlite::Connection;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-pub struct DbState(pub Mutex<Connection>);
+// Arc-wrapped so background tasks (e.g. auto-embed spawned from
+// ingest_paths) can hold their own owned reference to the same Mutex
+// without borrowing from a Tauri `State`.
+pub struct DbState(pub Arc<Mutex<Connection>>);
 
 pub fn open(db_path: &Path) -> rusqlite::Result<Connection> {
     if let Some(parent) = db_path.parent() {
