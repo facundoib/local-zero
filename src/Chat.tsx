@@ -2,15 +2,22 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { chatStream, pickChatModel, type ChatMessage } from "./lemonade";
 
-// SPEC §F5 — locked Spanish system prompt for RAG-aware chat. The two
-// "fragmentos provistos" / "Si la respuesta no está en los fragmentos"
-// lines are what turn this into RAG instead of free-form chat. The two
-// ES-locking lines harden against the documented Qwen3 English-thinking
-// defect (arXiv 2508.10355). See docs/decisions/v0.1-model-selection.md.
+// SPEC §F5 — locked Spanish system prompt for RAG-aware chat. The
+// "fragmentos" / "Si la respuesta no está en los fragmentos" lines turn
+// this into RAG instead of free-form chat. The two ES-locking lines
+// harden against the documented Qwen3 English-thinking defect (arXiv
+// 2508.10355). The three "PREGUNTA ACTUAL" lines harden against
+// multi-turn drift observed on Qwen3-4B-Instruct-2507: when a follow-up
+// question's retrieved fragments overlap semantically with the previous
+// answer, the small model anchors on the prior assistant turn and
+// re-emits its content instead of answering the new question. Evidence:
+// Amazon-PDF multi-turn smoke 2026-05-09 (Q2 returned A1 verbatim).
 const SYSTEM_PROMPT_RAG = `Sos un asistente que responde en español rioplatense, formal y al grano.
 Respondé SIEMPRE en español, sin alternar al inglés bajo ninguna circunstancia.
 No "pienses" en inglés y traduzcas: razoná directamente en español.
-Usás únicamente la información de los fragmentos provistos para responder.
+Cada mensaje del usuario trae sus propios fragmentos y una PREGUNTA ACTUAL.
+Respondé únicamente la PREGUNTA ACTUAL del último mensaje, usando solo sus fragmentos.
+Las respuestas anteriores en el chat son contexto conversacional, no fuente de información: no las repitas ni elabores sobre ellas.
 Si la respuesta no está en los fragmentos, decilo explícitamente.
 No inventes datos. No agregues frases tipo "como modelo de lenguaje" ni "as an AI".
 No insertes palabras en inglés salvo nombres propios técnicos.`;
@@ -46,11 +53,22 @@ interface VisibleMessage {
   retrieval?: { chunksUsed: number; docsConsulted: number };
 }
 
-function formatContext(chunks: RetrievedChunk[]): string {
+// Formats the user message so the question lands first (small models
+// drop attention after long context blocks) and the fragments follow as
+// a clearly-labeled reference list. The "PREGUNTA ACTUAL" tag matches
+// the SYSTEM_PROMPT_RAG anchor so the model can disambiguate this
+// turn's question from prior assistant content.
+function formatRagUserMessage(question: string, chunks: RetrievedChunk[]): string {
   const blocks = chunks.map((c, i) =>
     `[${i + 1}] ${c.document_filename} · fragmento ${c.ordinal}\n${c.text}`,
   );
-  return `FRAGMENTOS PROVISTOS:\n${blocks.join("\n\n")}`;
+  return [
+    `PREGUNTA ACTUAL: ${question}`,
+    "",
+    "Para responderla, usá solo los siguientes fragmentos:",
+    "",
+    blocks.join("\n\n"),
+  ].join("\n");
 }
 
 export function Chat() {
@@ -128,7 +146,7 @@ export function Chat() {
       .slice(0, -2)
       .map((m) => ({ role: m.role, content: m.content }) as ChatMessage);
     const currentUserContent = useRag
-      ? `${formatContext(chunks)}\n\nPREGUNTA: ${text}`
+      ? formatRagUserMessage(text, chunks)
       : text;
     const apiMessages: ChatMessage[] = [
       {
