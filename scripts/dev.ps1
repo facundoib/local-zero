@@ -11,6 +11,9 @@ Why this exists:
 
 Prerequisite:
   Vite must be running. In another terminal: `npm run dev` (serves on :1420).
+  Lemonade Server should be running (lemonade list / lemonade status). The
+  script will check Lemonade's persistent ctx_size and bump it to 32K if
+  the SPEC §F5 budget hasn't been set — this is one-shot, idempotent.
 
 Usage:
   .\scripts\dev.ps1            # build + launch
@@ -28,6 +31,34 @@ $root    = Split-Path -Parent $PSScriptRoot
 $srcTauri = Join-Path $root "src-tauri"
 $exe     = Join-Path $srcTauri "target\debug\local-zero.exe"
 $viteUrl = "http://localhost:1420/"
+$ctxBudget = 32768   # SPEC §F5: 32K context budget for multi-turn RAG
+
+# 0. Ensure Lemonade's persistent ctx_size is at least the SPEC §F5 budget.
+#    Lemonade defaults to 4096, which overflows after ~3 RAG turns when each
+#    turn carries ~3 KB of fragments. The setting is server-wide and persists
+#    across restarts. Currently-loaded models keep their old ctx until they
+#    are unloaded; we print the unload/load command in the warning so the
+#    user can fix a stuck session without re-reading the issue. See #4.
+$lemonadeCfg = $null
+try {
+    $lemonadeCfg = lemonade config 2>$null
+} catch {
+    # CLI unavailable; skip silently. Vite check or chat probe will surface it.
+}
+if ($lemonadeCfg) {
+    $match = $lemonadeCfg | Select-String -Pattern '^\s*ctx_size\s+(\d+)' | Select-Object -First 1
+    if ($match) {
+        $current = [int]$match.Matches[0].Groups[1].Value
+        if ($current -lt $ctxBudget) {
+            Write-Host "[..] bumping Lemonade ctx_size $current -> $ctxBudget (SPEC F5 budget)"
+            lemonade config set "ctx_size=$ctxBudget" | Out-Null
+            Write-Warning "Loaded models keep the old ctx until reloaded. If a chat model is hot:"
+            Write-Host  "       lemonade unload <model>; lemonade load <model>"
+        } else {
+            Write-Host "[ok] Lemonade ctx_size=$current"
+        }
+    }
+}
 
 # 1. Verify Vite is up — otherwise WebView2 will show a localhost-refused page.
 try {
