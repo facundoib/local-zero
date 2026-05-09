@@ -51,6 +51,20 @@ interface VisibleMessage {
   role: "user" | "assistant";
   content: string;
   retrieval?: { chunksUsed: number; docsConsulted: number };
+  droppedTurns?: number;
+}
+
+// SPEC §F5 budget: 32K context window, with the persistent ctx_size
+// bump landed in scripts/dev.ps1 (issue #4 part A). We reserve
+// ~4K for the streamed response (max_tokens=1024 + safety margin) and
+// use 28K as the prompt budget. Approximate token counter is good
+// enough here -- cl100k_base BPE on Spanish text yields ~3.5 chars/
+// token, and we round up to err on the side of dropping earlier
+// rather than overflowing Lemonade's hard 32K limit.
+const MAX_PROMPT_TOKENS = 28000;
+
+function approxTokens(s: string): number {
+  return Math.ceil(s.length / 3.5);
 }
 
 // Formats the user message so the question lands first (small models
@@ -69,6 +83,35 @@ function formatRagUserMessage(question: string, chunks: RetrievedChunk[]): strin
     "",
     blocks.join("\n\n"),
   ].join("\n");
+}
+
+// SPEC §F5 FIFO drop: when the prompt budget is exceeded, drop the
+// oldest user+assistant pair from the history until the prompt fits.
+// The system message [0] and the current user message [last] are
+// inviolable -- system is the contract, current user is what we're
+// trying to answer. Returns the trimmed message list and the number
+// of conversational turns (user+assistant pairs) that were dropped,
+// so the UI can surface the FIFO event in the assistant turn's hint.
+function applyContextBudget(messages: ChatMessage[]): {
+  trimmed: ChatMessage[];
+  droppedTurns: number;
+} {
+  if (messages.length < 4) return { trimmed: messages, droppedTurns: 0 };
+  const out = [...messages];
+  let droppedTurns = 0;
+  // Guard `>= 4` is required: splice(1, 2) needs at least 2 history items
+  // (length = system + ≥2 history + currentUser ≥ 4) so we never remove
+  // the inviolable system [0] or currentUser [last]. Well-formed
+  // histories always have a user at index 1 and its assistant at
+  // index 2; the orphan-user edge case from a failed turn is a
+  // pre-existing bug not addressed here.
+  while (out.length >= 4) {
+    const total = out.reduce((s, m) => s + approxTokens(m.content), 0);
+    if (total <= MAX_PROMPT_TOKENS) break;
+    out.splice(1, 2);
+    droppedTurns += 1;
+  }
+  return { trimmed: out, droppedTurns };
 }
 
 export function Chat() {
@@ -148,7 +191,7 @@ export function Chat() {
     const currentUserContent = useRag
       ? formatRagUserMessage(text, chunks)
       : text;
-    const apiMessages: ChatMessage[] = [
+    const fullMessages: ChatMessage[] = [
       {
         role: "system",
         content: useRag ? SYSTEM_PROMPT_RAG : SYSTEM_PROMPT_NO_RAG,
@@ -156,6 +199,20 @@ export function Chat() {
       ...history,
       { role: "user", content: currentUserContent },
     ];
+    const { trimmed: apiMessages, droppedTurns } = applyContextBudget(fullMessages);
+    if (droppedTurns > 0) {
+      // Stamp the dropped-turn count onto the assistant placeholder we
+      // just appended to messages, so the hint renders alongside the
+      // retrieval line for this turn.
+      setMessages((prev) => {
+        const out = prev.slice();
+        const last = out[out.length - 1];
+        if (last && last.role === "assistant") {
+          out[out.length - 1] = { ...last, droppedTurns };
+        }
+        return out;
+      });
+    }
 
     try {
       await chatStream({
@@ -214,13 +271,26 @@ export function Chat() {
           messages.map((m, i) => (
             <div key={i} className={`chat__msg chat__msg--${m.role}`}>
               <span className="chat__role">{m.role === "user" ? "Vos" : "Asistente"}</span>
-              {m.retrieval && (
+              {(m.retrieval || m.droppedTurns) && (
                 <span className="chat__retrieval">
-                  📄 {m.retrieval.chunksUsed} fragmento
-                  {m.retrieval.chunksUsed === 1 ? "" : "s"} consultado
-                  {m.retrieval.chunksUsed === 1 ? "" : "s"} de{" "}
-                  {m.retrieval.docsConsulted} doc
-                  {m.retrieval.docsConsulted === 1 ? "" : "s"}
+                  {m.retrieval && (
+                    <>
+                      📄 {m.retrieval.chunksUsed} fragmento
+                      {m.retrieval.chunksUsed === 1 ? "" : "s"} consultado
+                      {m.retrieval.chunksUsed === 1 ? "" : "s"} de{" "}
+                      {m.retrieval.docsConsulted} doc
+                      {m.retrieval.docsConsulted === 1 ? "" : "s"}
+                    </>
+                  )}
+                  {m.droppedTurns ? (
+                    <>
+                      {m.retrieval ? " · " : ""}
+                      ✂️ {m.droppedTurns} turno
+                      {m.droppedTurns === 1 ? "" : "s"} antiguo
+                      {m.droppedTurns === 1 ? "" : "s"} descartado
+                      {m.droppedTurns === 1 ? "" : "s"}
+                    </>
+                  ) : null}
                 </span>
               )}
               <div className="chat__content">
