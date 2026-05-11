@@ -132,10 +132,56 @@ export async function chatStream(opts: ChatStreamOptions): Promise<void> {
   }
 }
 
+// Converts any browser-decodable audio blob to 16-bit mono PCM WAV.
+// Required because Lemonade's Whisper server rejects audio/webm (OQ#5-b).
+async function blobToWav(blob: Blob): Promise<Blob> {
+  const arrayBuffer = await blob.arrayBuffer();
+  const audioCtx = new AudioContext();
+  const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+  await audioCtx.close();
+
+  const numSamples = decoded.length;
+  const sampleRate = decoded.sampleRate;
+  const mixed = new Float32Array(numSamples);
+  for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
+    const chan = decoded.getChannelData(ch);
+    for (let i = 0; i < numSamples; i++) mixed[i] += chan[i];
+  }
+  if (decoded.numberOfChannels > 1) {
+    for (let i = 0; i < numSamples; i++) mixed[i] /= decoded.numberOfChannels;
+  }
+
+  const dataBytes = numSamples * 2;
+  const buf = new ArrayBuffer(44 + dataBytes);
+  const v = new DataView(buf);
+  const w = (off: number, str: string) => {
+    for (let i = 0; i < str.length; i++) v.setUint8(off + i, str.charCodeAt(i));
+  };
+  w(0, "RIFF"); v.setUint32(4, 36 + dataBytes, true);
+  w(8, "WAVE"); w(12, "fmt ");
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);              // PCM
+  v.setUint16(22, 1, true);              // mono
+  v.setUint32(24, sampleRate, true);
+  v.setUint32(28, sampleRate * 2, true); // byte rate
+  v.setUint16(32, 2, true);              // block align
+  v.setUint16(34, 16, true);             // bit depth
+  w(36, "data"); v.setUint32(40, dataBytes, true);
+  let off = 44;
+  for (let i = 0; i < numSamples; i++) {
+    const s = Math.max(-1, Math.min(1, mixed[i]));
+    v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    off += 2;
+  }
+  return new Blob([buf], { type: "audio/wav" });
+}
+
 // Sends a recorded audio blob to Lemonade /audio/transcriptions (Whisper).
+// Converts to WAV first because Lemonade rejects audio/webm (OQ#5-b).
 export async function transcribeAudio(blob: Blob): Promise<string> {
+  const wav = await blobToWav(blob);
   const form = new FormData();
-  form.append("file", new File([blob], "recording.webm", { type: blob.type }));
+  form.append("file", new File([wav], "recording.wav", { type: "audio/wav" }));
   form.append("model", WHISPER_MODEL);
   const resp = await fetch(`${LEMONADE_URL}/audio/transcriptions`, {
     method: "POST",
