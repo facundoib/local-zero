@@ -4,6 +4,9 @@
 
 export const LEMONADE_URL = "http://localhost:13305/api/v1";
 export const EMBED_MODEL = "Qwen3-Embedding-0.6B-GGUF";
+export const WHISPER_MODEL = "Whisper-Large-v3-Turbo";
+export const KOKORO_MODEL = "kokoro-v1";
+export const KOKORO_VOICE = "ef_dora";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -127,4 +130,35 @@ export async function chatStream(opts: ChatStreamOptions): Promise<void> {
       }
     }
   }
+}
+
+// Sends a recorded audio blob to Lemonade /audio/transcriptions (Whisper).
+export async function transcribeAudio(blob: Blob): Promise<string> {
+  const form = new FormData();
+  form.append("file", new File([blob], "recording.webm", { type: blob.type }));
+  form.append("model", WHISPER_MODEL);
+  const resp = await fetch(`${LEMONADE_URL}/audio/transcriptions`, {
+    method: "POST",
+    body: form,
+  });
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    throw new Error(`Whisper ${resp.status}: ${body}`);
+  }
+  const data = (await resp.json()) as { text?: string };
+  return (data.text ?? "").trim();
+}
+
+// Sends text to Lemonade /audio/speech (Kokoro) and returns the audio blob.
+export async function synthesizeSpeech(text: string): Promise<Blob> {
+  const resp = await fetch(`${LEMONADE_URL}/audio/speech`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ model: KOKORO_MODEL, input: text, voice: KOKORO_VOICE }),
+  });
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    throw new Error(`Kokoro ${resp.status}: ${body}`);
+  }
+  return resp.blob();
 }

@@ -483,3 +483,85 @@ body {
     color: #5a5550;
   }
 }
+
+/* ── Voice controls (F6) ─────────────────────────────────── */
+
+.status--warn {
+  color: #b35936;
+  font-size: 0.88rem;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.chat__voice-toggle {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid #c9bfae;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #8a857f;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.chat__voice-toggle--on {
+  border-color: #b35936;
+  color: #b35936;
+}
+
+.chat__voice-toggle:hover {
+  background: #f1ebde;
+}
+
+.chat__mic {
+  flex-shrink: 0;
+  width: 38px;
+  border: 1px solid #c9bfae;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #5a5550;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.chat__mic:hover:not(:disabled) {
+  background: #f1ebde;
+}
+
+.chat__mic:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat__mic--recording {
+  border-color: #b35936;
+  color: #b35936;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .chat__voice-toggle {
+    border-color: #3a3631;
+    color: #8a857f;
+  }
+
+  .chat__voice-toggle:hover {
+    background: #2a2724;
+  }
+
+  .chat__mic {
+    border-color: #3a3631;
+    color: #a59c8e;
+  }
+
+  .chat__mic:hover:not(:disabled) {
+    background: #2a2724;
+  }
+}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { chatStream, pickChatModel, type ChatMessage } from "./lemonade";
+import { chatStream, pickChatModel, transcribeAudio, synthesizeSpeech, type ChatMessage } from "./lemonade";
 
 // SPEC §F5 — locked Spanish system prompt for RAG-aware chat. The
 // "fragmentos" / "Si la respuesta no está en los fragmentos" lines turn
@@ -122,6 +122,15 @@ export function Chat() {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [micState, setMicState] = useState<
+    "idle" | "requesting" | "recording" | "transcribing" | "denied"
+  >("idle");
+  const [ttsPlaying, setTtsPlaying] = useState(false);
+  const [ttsError, setTtsError] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const audioRef = useRef(new Audio());
 
   useEffect(() => {
     pickChatModel()
@@ -214,12 +223,14 @@ export function Chat() {
       });
     }
 
+    let finalResponseText = "";
     try {
       await chatStream({
         messages: apiMessages,
         model,
         signal: controller.signal,
         onToken: (token) => {
+          finalResponseText += token;
           setMessages((prev) => {
             const out = prev.slice();
             const last = out[out.length - 1];
@@ -230,6 +241,7 @@ export function Chat() {
           });
         },
       });
+      if (voiceEnabled && finalResponseText) speakResponse(finalResponseText);
     } catch (e) {
       if ((e as Error).name === "AbortError") {
         // User cancelled — leave whatever tokens arrived in place.
@@ -254,11 +266,85 @@ export function Chat() {
     }
   }
 
+  async function handleMicClick() {
+    if (micState === "recording") {
+      mediaRecorderRef.current?.stop();
+      return;
+    }
+
+    setMicState("requesting");
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      if ((e as DOMException).name === "NotAllowedError") {
+        setMicState("denied");
+      } else {
+        setError(`Micrófono: ${String(e)}`);
+        setMicState("idle");
+      }
+      return;
+    }
+
+    chunksRef.current = [];
+    const mr = new MediaRecorder(stream);
+    mediaRecorderRef.current = mr;
+    mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+    mr.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setMicState("transcribing");
+      try {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const text = await transcribeAudio(blob);
+        setInput((prev) => (prev ? `${prev} ${text}` : text));
+      } catch (e) {
+        setError(`Transcripción falló: ${String(e)}`);
+      } finally {
+        setMicState("idle");
+      }
+    };
+    mr.start();
+    setMicState("recording");
+  }
+
+  function speakResponse(text: string) {
+    setTtsError(null);
+    audioRef.current.pause();
+    audioRef.current.src = "";
+    synthesizeSpeech(text)
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const audio = audioRef.current;
+        audio.src = url;
+        audio.onplay = () => setTtsPlaying(true);
+        audio.onended = () => { setTtsPlaying(false); URL.revokeObjectURL(url); };
+        audio.onerror = () => { setTtsPlaying(false); URL.revokeObjectURL(url); };
+        audio.play().catch(() => setTtsPlaying(false));
+      })
+      .catch(() => {
+        setTtsError("TTS falló — verificá que kokoro-v1 esté cargado en Lemonade.");
+      });
+  }
+
+  function handleCancelTts() {
+    audioRef.current.pause();
+    audioRef.current.src = "";
+    setTtsPlaying(false);
+  }
+
   return (
     <section className="chat">
       <header className="chat__header">
         <h2>Chat</h2>
         <span className="chat__model">{model ?? "detectando modelo…"}</span>
+        <button
+          type="button"
+          className={`chat__voice-toggle${voiceEnabled ? " chat__voice-toggle--on" : ""}`}
+          onClick={() => setVoiceEnabled((v) => !v)}
+          title={voiceEnabled ? "Desactivar voz" : "Activar voz"}
+        >
+          {voiceEnabled ? "🔊" : "🔇"}
+        </button>
       </header>
 
       <div className="chat__messages" ref={scrollRef}>
@@ -302,8 +388,25 @@ export function Chat() {
       </div>
 
       {error && <p className="status status--err">Error: {error}</p>}
+      {micState === "denied" && (
+        <p className="status status--err">
+          Permiso de micrófono denegado. Habilitalo en Configuración → Privacidad → Micrófono.
+        </p>
+      )}
+      {ttsError && <p className="status status--warn">{ttsError}</p>}
 
       <div className="chat__input-row">
+        {voiceEnabled && (
+          <button
+            type="button"
+            className={`chat__mic${micState === "recording" ? " chat__mic--recording" : ""}`}
+            onClick={handleMicClick}
+            disabled={micState === "requesting" || micState === "transcribing" || streaming}
+            title={micState === "recording" ? "Detener grabación" : "Grabar mensaje de voz"}
+          >
+            {micState === "recording" ? "⏹" : micState === "transcribing" ? "…" : "🎤"}
+          </button>
+        )}
         <textarea
           className="chat__input"
           rows={2}
@@ -316,6 +419,10 @@ export function Chat() {
         {streaming ? (
           <button type="button" className="chat__btn chat__btn--cancel" onClick={handleCancel}>
             Cancelar
+          </button>
+        ) : ttsPlaying ? (
+          <button type="button" className="chat__btn chat__btn--cancel" onClick={handleCancelTts}>
+            Silenciar
           </button>
         ) : (
           <button
