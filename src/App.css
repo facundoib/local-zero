@@ -565,3 +565,330 @@ body {
     background: #2a2724;
   }
 }
+
+/* ── F7 — Educational panel ──────────────────────────────── */
+
+body.edu-open .app {
+  max-width: 1100px;
+}
+
+/* Transparent wrapper by default — children flow as if it doesn't exist. */
+.chat-wrapper {
+  display: contents;
+}
+
+.chat-wrapper--edu {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.chat-wrapper--edu .chat {
+  flex: 0 0 440px;
+  min-width: 0;
+}
+
+.edu-panel {
+  flex: 1;
+  min-width: 280px;
+  border: 1px solid #e5dfd2;
+  border-radius: 8px;
+  background: #fff;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 80vh;
+  overflow-y: auto;
+  align-self: stretch;
+}
+
+.edu-panel__title {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #3a3631;
+}
+
+.edu-panel__empty {
+  margin: 0;
+  color: #8a857f;
+  font-style: italic;
+  font-size: 0.88rem;
+}
+
+.edu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid #efe9dc;
+  padding: 12px 0;
+}
+
+.edu-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.edu-section__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edu-section__num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #b35936;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.edu-section__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #3a3631;
+  flex: 1;
+}
+
+.edu-section__explain-btn {
+  background: transparent;
+  border: 1px solid #c9bfae;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  color: #8a857f;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.edu-section__explain-btn:hover {
+  background: #f1ebde;
+  border-color: #a89e8d;
+}
+
+.edu-section__body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.edu-section__pending {
+  margin: 0;
+  color: #a59c8e;
+  font-style: italic;
+  font-size: 0.82rem;
+}
+
+.edu-section__empty-note {
+  margin: 0;
+  color: #8a857f;
+  font-size: 0.82rem;
+}
+
+.edu-section__explanation {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #5a5550;
+  line-height: 1.55;
+  background: #f6f3ee;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.edu-vector {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 0.72rem;
+  color: #3a3631;
+  word-break: break-all;
+}
+
+.edu-vector__dim {
+  font-size: 0.75rem;
+  color: #8a857f;
+  white-space: nowrap;
+}
+
+.edu-chunks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.edu-chunk {
+  border: 1px solid #efe9dc;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: #fbf9f4;
+}
+
+.edu-chunk__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.edu-chunk__doc {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #5a5550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edu-chunk__score {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 0.75rem;
+  color: #b35936;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.edu-chunk__excerpt {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #5a5550;
+  line-height: 1.4;
+}
+
+.edu-prompt {
+  margin: 0;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: #3a3631;
+  background: #f0ece5;
+  border: 1px solid #e5dfd2;
+  border-radius: 6px;
+  padding: 8px 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.edu-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 0.82rem;
+  color: #3a3631;
+}
+
+.edu-stats__sep {
+  color: #c9bfae;
+}
+
+.edu-stats__live {
+  color: #b35936;
+  font-size: 0.55rem;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.chat__edu-toggle {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid #c9bfae;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #8a857f;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.chat__edu-toggle--on {
+  border-color: #b35936;
+  color: #b35936;
+}
+
+.chat__edu-toggle:hover {
+  background: #f1ebde;
+}
+
+/* Remove the auto-margin from voice toggle now that edu toggle has it */
+.chat__voice-toggle {
+  margin-left: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .edu-panel {
+    background: #232120;
+    border-color: #3a3631;
+  }
+
+  .edu-panel__title {
+    color: #ede8e0;
+  }
+
+  .edu-section {
+    border-color: #2e2b27;
+  }
+
+  .edu-section__label {
+    color: #ede8e0;
+  }
+
+  .edu-section__explanation {
+    background: #2a2724;
+    color: #a59c8e;
+  }
+
+  .edu-vector {
+    color: #ede8e0;
+  }
+
+  .edu-chunk {
+    background: #1c1a18;
+    border-color: #2e2b27;
+  }
+
+  .edu-chunk__doc {
+    color: #a59c8e;
+  }
+
+  .edu-prompt {
+    background: #1c1a18;
+    border-color: #2e2b27;
+    color: #ede8e0;
+  }
+
+  .edu-stats {
+    color: #ede8e0;
+  }
+
+  .edu-section__explain-btn {
+    border-color: #3a3631;
+    color: #8a857f;
+  }
+
+  .edu-section__explain-btn:hover {
+    background: #2a2724;
+    border-color: #5a5550;
+  }
+
+  .chat__edu-toggle {
+    border-color: #3a3631;
+    color: #8a857f;
+  }
+
+  .chat__edu-toggle:hover {
+    background: #2a2724;
+  }
+}

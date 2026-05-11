@@ -28,6 +28,8 @@ pub struct RetrievalResult {
     pub embed_ms: u64,
     pub search_ms: u64,
     pub total_chunks: i64,
+    pub query_vector_preview: Vec<f32>,
+    pub query_vector_dim: usize,
 }
 
 #[tauri::command]
@@ -53,6 +55,8 @@ pub fn retrieve(
     if q_norm == 0.0 {
         return Err("la consulta produjo un vector nulo".to_string());
     }
+    let q_dim = q_vec.len();
+    let q_preview: Vec<f32> = q_vec.iter().take(8).copied().collect();
 
     // Step 2: brute-force cosine over the active document set. SPEC §F3
     // budgets ≤50 ms for ≤5,000 chunks on recommended hardware. We pull
@@ -131,6 +135,8 @@ pub fn retrieve(
         embed_ms,
         search_ms,
         total_chunks,
+        query_vector_preview: q_preview,
+        query_vector_dim: q_dim,
     })
 }
 
