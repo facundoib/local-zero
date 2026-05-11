@@ -3,6 +3,7 @@
 // bugs; the native window.fetch() inside WebView2 handles SSE cleanly.
 
 export const LEMONADE_URL = "http://localhost:13305/api/v1";
+export const EMBED_MODEL = "Qwen3-Embedding-0.6B-GGUF";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";

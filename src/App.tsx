@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Chat } from "./Chat";
+import { LEMONADE_URL, EMBED_MODEL } from "./lemonade";
 import "./App.css";
 
 function isTauri(): boolean {
@@ -37,11 +38,7 @@ interface EmbedProgress {
   total: number;
 }
 
-// Mirror of embed.rs LEMONADE_URL / EMBED_MODEL. Hardcoded here rather
-// than imported from lemonade.ts to keep this health probe independent
-// of the chat client's caching state.
-const LEMONADE_HEALTH_URL = "http://localhost:13305/api/v1/models";
-const REQUIRED_EMBED_MODEL = "Qwen3-Embedding-0.6B-GGUF";
+const LEMONADE_HEALTH_URL = `${LEMONADE_URL}/models`;
 
 type LemonadeHealth =
   | { kind: "checking" }
@@ -73,7 +70,7 @@ function App() {
         return;
       }
       const json = (await resp.json()) as { data?: { id: string }[] };
-      const has = (json.data ?? []).some((m) => m.id === REQUIRED_EMBED_MODEL);
+      const has = (json.data ?? []).some((m) => m.id === EMBED_MODEL);
       setHealth({ kind: has ? "ok" : "embed-missing" });
     } catch {
       // fetch throws on TypeError network failure (server not running,
@@ -234,9 +231,9 @@ function App() {
               </>
             ) : (
               <>
-                Falta el modelo de embeddings <code>{REQUIRED_EMBED_MODEL}</code>{" "}
+                Falta el modelo de embeddings <code>{EMBED_MODEL}</code>{" "}
                 en Lemonade. Ejecutá:{" "}
-                <code>lemonade pull {REQUIRED_EMBED_MODEL}</code>
+                <code>lemonade pull {EMBED_MODEL}</code>
               </>
             )}
           </span>
