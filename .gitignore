@@ -15,6 +15,9 @@ dist-ssr
 # Local Claude context (per workspace pattern; stays on the maintainer's machine)
 CLAUDE.md
 
+# Temporary review notes (delete once processed into CLAUDE.md / SPEC / issues)
+REVIEW-*-tmp.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
