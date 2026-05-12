@@ -1,5 +1,7 @@
 mod db;
 mod embed;
+mod evals;
+mod export;
 mod ingest;
 mod retrieval;
 
@@ -23,7 +25,12 @@ pub fn run() {
             ingest::ingest_paths,
             ingest::list_documents,
             embed::embed_document,
-            retrieval::retrieve
+            retrieval::retrieve,
+            evals::list_evals,
+            evals::add_eval,
+            evals::delete_eval,
+            export::check_export_gates,
+            export::export_starter
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

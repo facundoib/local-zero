@@ -40,6 +40,12 @@ fn bootstrap(conn: &Connection) -> rusqlite::Result<()> {
             vector   BLOB    NOT NULL,
             dim      INTEGER NOT NULL,
             model    TEXT    NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS evals (
+            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            question           TEXT    NOT NULL,
+            expected_substring TEXT    NOT NULL,
+            created_at         INTEGER NOT NULL
          );",
     )
 }

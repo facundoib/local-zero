@@ -4,6 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Chat } from "./Chat";
+import { EvalEditor } from "./EvalEditor";
+import { ExportPanel } from "./ExportPanel";
 import { LEMONADE_URL, EMBED_MODEL } from "./lemonade";
 import "./App.css";
 
@@ -60,6 +62,7 @@ function App() {
     Record<number, { done: number; total: number }>
   >({});
   const [health, setHealth] = useState<LemonadeHealth>({ kind: "checking" });
+  const [evalRefreshKey, setEvalRefreshKey] = useState(0);
 
   async function checkLemonadeHealth() {
     setHealth({ kind: "checking" });
@@ -310,6 +313,8 @@ function App() {
         )}
       </section>
 
+      <EvalEditor onCountChange={() => setEvalRefreshKey((k) => k + 1)} />
+      <ExportPanel refreshKey={evalRefreshKey} />
       <Chat />
     </main>
   );

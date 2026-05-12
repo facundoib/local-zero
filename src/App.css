@@ -566,6 +566,473 @@ body {
   }
 }
 
+/* ── F8 — Eval editor ────────────────────────────────────── */
+
+.eval-editor {
+  border: 1px solid #e5dfd2;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.eval-editor__header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.eval-editor__header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.eval-editor__count {
+  font-size: 0.85rem;
+  color: #b35936;
+  font-weight: 500;
+}
+
+.eval-editor__count--ok {
+  color: #2c5e2e;
+}
+
+.eval-editor__desc {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #5a5550;
+}
+
+.eval-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #e5dfd2;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fbf9f4;
+}
+
+.eval-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #efe9dc;
+}
+
+.eval-item:last-child {
+  border-bottom: none;
+}
+
+.eval-item__body {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: 0.88rem;
+  flex-wrap: wrap;
+}
+
+.eval-item__question {
+  font-weight: 500;
+  color: #3a3631;
+}
+
+.eval-item__arrow {
+  color: #c9bfae;
+  flex-shrink: 0;
+}
+
+.eval-item__expected {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 0.82rem;
+  color: #b35936;
+  background: #fbeee5;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.eval-item__delete {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: #c9bfae;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.eval-item__delete:hover {
+  background: #f7e9e4;
+  color: #b35936;
+}
+
+.eval-add {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.eval-add__input {
+  flex: 1;
+  min-width: 180px;
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 7px 10px;
+  border: 1px solid #c9bfae;
+  border-radius: 6px;
+  background: #fbf9f4;
+  color: inherit;
+}
+
+.eval-add__input:focus {
+  outline: 2px solid #b35936;
+  outline-offset: -1px;
+}
+
+.eval-add__btn {
+  padding: 0 16px;
+  border: 1px solid #b35936;
+  background: #b35936;
+  color: #fff;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.eval-add__btn:hover:not(:disabled) {
+  background: #9a4a2c;
+}
+
+.eval-add__btn:disabled {
+  background: #d3c8b8;
+  border-color: #d3c8b8;
+  color: #8a857f;
+  cursor: not-allowed;
+}
+
+/* ── F8 — Export panel ───────────────────────────────────── */
+
+.export-panel {
+  border: 1px solid #e5dfd2;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.export-panel__header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.export-panel__header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.export-panel__badge {
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f1ebde;
+  color: #8a857f;
+}
+
+.export-panel__badge--ok {
+  background: #eaf3e8;
+  color: #2c5e2e;
+}
+
+.export-gates {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.export-gate {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.88rem;
+  padding: 4px 0;
+}
+
+.export-gate__icon {
+  font-size: 0.8rem;
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.export-gate--ok .export-gate__icon {
+  color: #2c5e2e;
+}
+
+.export-gate--fail .export-gate__icon {
+  color: #b35936;
+}
+
+.export-gate--g3 .export-gate__icon {
+  color: #a59c8e;
+}
+
+.export-gate__text {
+  color: #3a3631;
+}
+
+.export-gate--g3 .export-gate__text {
+  color: #8a857f;
+}
+
+.export-gate__hint {
+  color: #8a857f;
+  font-style: italic;
+}
+
+.export-btn {
+  align-self: flex-start;
+  padding: 8px 20px;
+  border: 1px solid #b35936;
+  background: #b35936;
+  color: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.export-btn:hover:not(:disabled) {
+  background: #9a4a2c;
+}
+
+.export-btn:disabled {
+  background: #d3c8b8;
+  border-color: #d3c8b8;
+  color: #8a857f;
+  cursor: not-allowed;
+}
+
+/* Export dialog (<dialog> native element) */
+
+.export-dialog {
+  border: 1px solid #e5dfd2;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  background: #fff;
+}
+
+.export-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.export-dialog__title {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.export-dialog__desc {
+  margin: 0 0 16px;
+  font-size: 0.88rem;
+  color: #5a5550;
+}
+
+.export-dialog__label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #3a3631;
+  margin-bottom: 14px;
+}
+
+.export-dialog__textarea {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 8px 10px;
+  border: 1px solid #c9bfae;
+  border-radius: 6px;
+  background: #fbf9f4;
+  color: inherit;
+  resize: vertical;
+}
+
+.export-dialog__textarea:focus {
+  outline: 2px solid #b35936;
+  outline-offset: -1px;
+}
+
+.export-dialog__char {
+  font-size: 0.75rem;
+  color: #b35936;
+  font-weight: 400;
+  align-self: flex-end;
+}
+
+.export-dialog__char--ok {
+  color: #2c5e2e;
+}
+
+.export-dialog__error {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  color: #8a3a1d;
+  background: #f7e9e4;
+  border: 1px solid #e6c8bd;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.export-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.export-dialog__cancel {
+  background: transparent;
+  border: 1px solid #c9bfae;
+  border-radius: 6px;
+  padding: 7px 16px;
+  font: inherit;
+  font-size: 0.88rem;
+  color: #5a5550;
+  cursor: pointer;
+}
+
+.export-dialog__cancel:hover {
+  background: #f1ebde;
+}
+
+.export-dialog__submit {
+  background: #b35936;
+  border: 1px solid #b35936;
+  border-radius: 6px;
+  padding: 7px 18px;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #fff;
+  cursor: pointer;
+}
+
+.export-dialog__submit:hover:not(:disabled) {
+  background: #9a4a2c;
+}
+
+.export-dialog__submit:disabled {
+  background: #d3c8b8;
+  border-color: #d3c8b8;
+  color: #8a857f;
+  cursor: not-allowed;
+}
+
+.export-dialog--success .export-dialog__code {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 0.78rem;
+  background: #f0ece5;
+  border: 1px solid #e5dfd2;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.export-dialog__reminder {
+  margin: 0 0 16px;
+  font-size: 0.85rem;
+  color: #5a5550;
+  line-height: 1.5;
+}
+
+@media (prefers-color-scheme: dark) {
+  .eval-editor,
+  .export-panel {
+    background: #232120;
+    border-color: #3a3631;
+  }
+
+  .eval-list {
+    background: #1c1a18;
+    border-color: #3a3631;
+  }
+
+  .eval-item {
+    border-color: #2e2b27;
+  }
+
+  .eval-item__question {
+    color: #ede8e0;
+  }
+
+  .eval-item__expected {
+    background: #2e2018;
+    color: #d97a55;
+  }
+
+  .eval-add__input {
+    background: #1c1a18;
+    border-color: #3a3631;
+    color: #ede8e0;
+  }
+
+  .export-gate__text {
+    color: #ede8e0;
+  }
+
+  .export-dialog {
+    background: #232120;
+    border-color: #3a3631;
+    color: #ede8e0;
+  }
+
+  .export-dialog__textarea {
+    background: #1c1a18;
+    border-color: #3a3631;
+    color: #ede8e0;
+  }
+
+  .export-dialog--success .export-dialog__code {
+    background: #1c1a18;
+    border-color: #2e2b27;
+    color: #ede8e0;
+  }
+
+  .export-panel__badge {
+    background: #2a2724;
+    color: #8a857f;
+  }
+
+  .export-panel__badge--ok {
+    background: #1f2c1f;
+    color: #c0d8c1;
+  }
+}
+
 /* ── F7 — Educational panel ──────────────────────────────── */
 
 body.edu-open .app {
