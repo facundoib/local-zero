@@ -5,6 +5,7 @@ use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 
 use crate::db::DbState;
+use crate::settings::SettingsState;
 
 #[derive(Serialize, Clone)]
 pub struct EmbedProgress {
@@ -13,8 +14,6 @@ pub struct EmbedProgress {
     pub total: usize,
 }
 
-pub const LEMONADE_URL: &str = "http://localhost:13305/api/v1";
-pub const EMBED_MODEL: &str = "Qwen3-Embedding-0.6B-GGUF";
 // SPEC §F2: 32 chunks per HTTP request to Lemonade /embeddings.
 const BATCH_SIZE: usize = 32;
 // Conservative ceiling for the slowest expected case (cold model load + a
@@ -54,8 +53,13 @@ pub fn embed_document(
     app: AppHandle,
     doc_id: i64,
     state: tauri::State<DbState>,
+    s_state: tauri::State<SettingsState>,
 ) -> Result<EmbedResult, String> {
-    embed_document_impl(app, doc_id, state.0.clone())
+    let (backend_url, embed_model) = {
+        let s = s_state.0.lock().map_err(|e| format!("settings lock: {e}"))?;
+        (s.backend_url.clone(), s.embed_model.clone())
+    };
+    embed_document_impl(app, doc_id, state.0.clone(), backend_url, embed_model)
 }
 
 // Implementation that doesn't borrow from `tauri::State`, so it can be
@@ -72,6 +76,8 @@ pub fn embed_document_impl(
     app: AppHandle,
     doc_id: i64,
     db: Arc<Mutex<Connection>>,
+    backend_url: String,
+    embed_model: String,
 ) -> Result<EmbedResult, String> {
     let started = Instant::now();
 
@@ -130,7 +136,7 @@ pub fn embed_document_impl(
             embedded: 0,
             already,
             dim: 0,
-            model: EMBED_MODEL.to_string(),
+            model: embed_model.clone(),
             elapsed_ms: started.elapsed().as_millis() as u64,
         });
     }
@@ -151,7 +157,7 @@ pub fn embed_document_impl(
 
     for batch in pending.chunks(BATCH_SIZE) {
         let inputs: Vec<String> = batch.iter().map(|(_, t)| t.clone()).collect();
-        let resp = call_embeddings(&inputs)?;
+        let resp = call_embeddings(&inputs, &backend_url, &embed_model)?;
 
         if resp.data.len() != batch.len() {
             return Err(format!(
@@ -192,7 +198,7 @@ pub fn embed_document_impl(
                 ));
             }
             let bytes = floats_to_bytes(&item.embedding);
-            stmt.execute(params![chunk_id, bytes, dim as i64, EMBED_MODEL])
+            stmt.execute(params![chunk_id, bytes, dim as i64, embed_model])
                 .map_err(|e| format!("inserting embedding for chunk {chunk_id}: {e}"))?;
             embedded += 1;
         }
@@ -213,7 +219,7 @@ pub fn embed_document_impl(
         embedded,
         already,
         dim: total_dim as i64,
-        model: EMBED_MODEL.to_string(),
+        model: embed_model,
         elapsed_ms: started.elapsed().as_millis() as u64,
     })
 }
@@ -221,8 +227,8 @@ pub fn embed_document_impl(
 // Embed a single string (e.g. a user question for retrieval).
 // Returns the raw Float32 vector — caller decides whether to store it,
 // reuse it, or compare against the corpus.
-pub fn embed_query(text: &str) -> Result<Vec<f32>, String> {
-    let resp = call_embeddings(&[text.to_string()])?;
+pub fn embed_query(text: &str, backend_url: &str, embed_model: &str) -> Result<Vec<f32>, String> {
+    let resp = call_embeddings(&[text.to_string()], backend_url, embed_model)?;
     if resp.data.len() != 1 {
         return Err(format!(
             "Lemonade returned {} embeddings for a single-input request",
@@ -232,10 +238,10 @@ pub fn embed_query(text: &str) -> Result<Vec<f32>, String> {
     Ok(resp.data.into_iter().next().unwrap().embedding)
 }
 
-fn call_embeddings(inputs: &[String]) -> Result<EmbedResponse, String> {
-    let url = format!("{LEMONADE_URL}/embeddings");
+fn call_embeddings(inputs: &[String], backend_url: &str, embed_model: &str) -> Result<EmbedResponse, String> {
+    let url = format!("{backend_url}/embeddings");
     let body = EmbedRequest {
-        model: EMBED_MODEL,
+        model: embed_model,
         input: inputs.to_vec(),
     };
     let resp = ureq::post(&url)

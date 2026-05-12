@@ -6,6 +6,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Chat } from "./Chat";
 import { EvalEditor } from "./EvalEditor";
 import { ExportPanel } from "./ExportPanel";
+import { Settings, type AppSettings } from "./Settings";
 import { LEMONADE_URL, EMBED_MODEL } from "./lemonade";
 import "./App.css";
 
@@ -40,7 +41,6 @@ interface EmbedProgress {
   total: number;
 }
 
-const LEMONADE_HEALTH_URL = `${LEMONADE_URL}/models`;
 
 type LemonadeHealth =
   | { kind: "checking" }
@@ -48,7 +48,28 @@ type LemonadeHealth =
   | { kind: "down" }
   | { kind: "embed-missing" };
 
+type View = "home" | "export" | "settings";
+
+const DEFAULT_SETTINGS: AppSettings = {
+  backend_url: LEMONADE_URL,
+  llm_model: "Qwen3-4B-Instruct-2507-GGUF",
+  embed_model: EMBED_MODEL,
+  voice_enabled: false,
+  tts_voice: "ef_dora",
+  top_k: 6,
+  theme: "system",
+};
+
+function applyTheme(theme: string) {
+  const root = document.documentElement;
+  if (theme === "dark") root.dataset.theme = "dark";
+  else if (theme === "light") root.dataset.theme = "light";
+  else delete root.dataset.theme;
+}
+
 function App() {
+  const [view, setView] = useState<View>("home");
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [docs, setDocs] = useState<DocumentRow[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -63,11 +84,13 @@ function App() {
   >({});
   const [health, setHealth] = useState<LemonadeHealth>({ kind: "checking" });
   const [evalRefreshKey, setEvalRefreshKey] = useState(0);
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
 
-  async function checkLemonadeHealth() {
+  async function checkLemonadeHealth(backendUrl?: string) {
     setHealth({ kind: "checking" });
+    const url = `${backendUrl ?? settings.backend_url}/models`;
     try {
-      const resp = await fetch(LEMONADE_HEALTH_URL);
+      const resp = await fetch(url);
       if (!resp.ok) {
         setHealth({ kind: "down" });
         return;
@@ -88,6 +111,17 @@ function App() {
       setDocs(list);
     } catch (e) {
       setError(`No pude leer la lista de documentos: ${String(e)}`);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    try {
+      await invoke("delete_document", { id });
+      setPendingDelete(null);
+      await refresh();
+    } catch (e) {
+      setError(`No pude eliminar el documento: ${String(e)}`);
+      setPendingDelete(null);
     }
   }
 
@@ -150,7 +184,13 @@ function App() {
     }
 
     refresh();
-    checkLemonadeHealth();
+    invoke<AppSettings>("get_settings")
+      .then((s) => {
+        setSettings(s);
+        applyTheme(s.theme);
+        checkLemonadeHealth(s.backend_url);
+      })
+      .catch(() => checkLemonadeHealth());
 
     // The listener registration is async; React.StrictMode in dev runs
     // mount → cleanup → mount, so cleanup may fire before the .then()
@@ -213,10 +253,63 @@ function App() {
     };
   }, []);
 
+  if (view === "settings") {
+    return (
+      <main className="app">
+        <Settings
+          initial={settings}
+          onBack={() => setView("home")}
+          onSave={(s) => {
+            setSettings(s);
+            applyTheme(s.theme);
+            checkLemonadeHealth(s.backend_url);
+            setView("home");
+          }}
+        />
+      </main>
+    );
+  }
+
+  if (view === "export") {
+    return (
+      <main className="app">
+        <header className="export-view__header">
+          <button
+            type="button"
+            className="export-view__back"
+            onClick={() => setView("home")}
+          >
+            ← Volver
+          </button>
+          <div>
+            <h1 className="export-view__title">Exportar mi starter</h1>
+            <p className="export-view__desc">
+              Documentá tus evaluaciones y exportá un proyecto TypeScript listo
+              para hacer fork. No es un portfolio todavía — se convierte en uno
+              con los commits que hagas encima.
+            </p>
+          </div>
+        </header>
+        <EvalEditor onCountChange={() => setEvalRefreshKey((k) => k + 1)} />
+        <ExportPanel refreshKey={evalRefreshKey} />
+      </main>
+    );
+  }
+
   return (
     <main className="app">
       <header className="hero">
-        <h1>Local Zero</h1>
+        <div className="hero__top">
+          <h1>Local Zero</h1>
+          <button
+            type="button"
+            className="hero__gear"
+            onClick={() => setView("settings")}
+            title="Configuración"
+          >
+            ⚙️
+          </button>
+        </div>
         <p className="hint">
           Arrastrá archivos <code>.txt</code>, <code>.md</code> o <code>.pdf</code>{" "}
           a la zona de abajo para ingresarlos.
@@ -243,7 +336,7 @@ function App() {
           <button
             type="button"
             className="lemonade-banner__retry"
-            onClick={checkLemonadeHealth}
+            onClick={() => checkLemonadeHealth()}
           >
             Reintentar
           </button>
@@ -289,23 +382,58 @@ function App() {
               const done = live?.done ?? d.embedded_count;
               const total = d.chunk_count;
               const embedding = total > 0 && done < total;
+              const confirming = pendingDelete === d.id;
               return (
-                <li key={d.id} className="doc-row">
-                  <span className="filename" title={d.filename}>
-                    {d.filename}
-                  </span>
-                  <span className="meta">
-                    {d.chunk_count} chunks · {formatBytes(d.byte_size)} ·{" "}
-                    {formatRelative(d.ingested_at)}
-                    {embedding && (
-                      <>
-                        {" · "}
-                        <span className="meta__embed">
-                          embedding {done}/{total}…
-                        </span>
-                      </>
-                    )}
-                  </span>
+                <li key={d.id} className={`doc-row${confirming ? " doc-row--confirming" : ""}`}>
+                  {confirming ? (
+                    <>
+                      <span className="doc-row__confirm-label">
+                        ¿Eliminar <strong>{d.filename}</strong>?
+                      </span>
+                      <span className="doc-row__confirm-actions">
+                        <button
+                          type="button"
+                          className="doc-row__confirm-cancel"
+                          onClick={() => setPendingDelete(null)}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          className="doc-row__confirm-ok"
+                          onClick={() => handleDelete(d.id)}
+                        >
+                          Eliminar
+                        </button>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="filename" title={d.filename}>
+                        {d.filename}
+                      </span>
+                      <span className="meta">
+                        {d.chunk_count} chunks · {formatBytes(d.byte_size)} ·{" "}
+                        {formatRelative(d.ingested_at)}
+                        {embedding && (
+                          <>
+                            {" · "}
+                            <span className="meta__embed">
+                              embedding {done}/{total}…
+                            </span>
+                          </>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        className="doc-row__delete"
+                        onClick={() => setPendingDelete(d.id)}
+                        title="Eliminar documento"
+                      >
+                        ✕
+                      </button>
+                    </>
+                  )}
                 </li>
               );
             })}
@@ -313,9 +441,23 @@ function App() {
         )}
       </section>
 
-      <EvalEditor onCountChange={() => setEvalRefreshKey((k) => k + 1)} />
-      <ExportPanel refreshKey={evalRefreshKey} />
-      <Chat />
+      <footer className="app-footer">
+        <button
+          type="button"
+          className="app-footer__export-btn"
+          onClick={() => setView("export")}
+        >
+          Exportar mi starter →
+        </button>
+      </footer>
+
+      <Chat
+        backendUrl={settings.backend_url}
+        llmModel={settings.llm_model}
+        ttsVoice={settings.tts_voice}
+        topK={settings.top_k}
+        voiceDefault={settings.voice_enabled}
+      />
     </main>
   );
 }

@@ -36,7 +36,6 @@ struct DocRow {
 }
 
 struct EvalRow {
-    id: i64,
     question: String,
     expected_substring: String,
 }
@@ -77,15 +76,14 @@ pub fn export_starter(
 
         let mut stmt = conn
             .prepare(
-                "SELECT id, question, expected_substring FROM evals ORDER BY created_at ASC",
+                "SELECT question, expected_substring FROM evals ORDER BY created_at ASC",
             )
             .map_err(|e| format!("preparing eval query: {e}"))?;
         let evals: Vec<EvalRow> = stmt
             .query_map(params![], |r| {
                 Ok(EvalRow {
-                    id: r.get(0)?,
-                    question: r.get(1)?,
-                    expected_substring: r.get(2)?,
+                    question: r.get(0)?,
+                    expected_substring: r.get(1)?,
                 })
             })
             .map_err(|e| format!("querying evals: {e}"))?

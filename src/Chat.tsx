@@ -379,7 +379,15 @@ function EduPanel({
   );
 }
 
-export function Chat() {
+interface ChatProps {
+  backendUrl: string;
+  llmModel: string;
+  ttsVoice: string;
+  topK: number;
+  voiceDefault: boolean;
+}
+
+export function Chat({ backendUrl, llmModel, ttsVoice, topK, voiceDefault }: ChatProps) {
   const [messages, setMessages] = useState<VisibleMessage[]>([]);
   const [input, setInput] = useState("");
   const [model, setModel] = useState<string | null>(null);
@@ -387,7 +395,7 @@ export function Chat() {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(voiceDefault);
   const [micState, setMicState] = useState<
     "idle" | "requesting" | "recording" | "transcribing" | "denied"
   >("idle");
@@ -415,10 +423,10 @@ export function Chat() {
   }, [panelOpen]);
 
   useEffect(() => {
-    pickChatModel()
+    pickChatModel(backendUrl, llmModel || undefined)
       .then(setModel)
       .catch((e) => setError(`No pude detectar un modelo de chat: ${String(e)}`));
-  }, []);
+  }, [backendUrl, llmModel]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -446,7 +454,7 @@ export function Chat() {
     try {
       const r = await invoke<RetrievalResult>("retrieve", {
         query: text,
-        topK: 6,
+        topK,
       });
       chunks = r.matches;
       eduVectorPreview = r.query_vector_preview;
@@ -527,6 +535,7 @@ export function Chat() {
         messages: apiMessages,
         model,
         signal: controller.signal,
+        baseUrl: backendUrl,
         onToken: (token) => {
           streamTokens++;
           finalResponseText += token;
@@ -623,7 +632,7 @@ export function Chat() {
       setMicState("transcribing");
       try {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        const text = await transcribeAudio(blob);
+        const text = await transcribeAudio(blob, backendUrl);
         setInput((prev) => (prev ? `${prev} ${text}` : text));
       } catch (e) {
         setError(`Transcripción falló: ${String(e)}`);
@@ -639,7 +648,7 @@ export function Chat() {
     setTtsError(null);
     audioRef.current.pause();
     audioRef.current.src = "";
-    synthesizeSpeech(text)
+    synthesizeSpeech(text, backendUrl, ttsVoice)
       .then((blob) => {
         const url = URL.createObjectURL(blob);
         const audio = audioRef.current;

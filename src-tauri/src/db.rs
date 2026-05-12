@@ -46,6 +46,18 @@ fn bootstrap(conn: &Connection) -> rusqlite::Result<()> {
             question           TEXT    NOT NULL,
             expected_substring TEXT    NOT NULL,
             created_at         INTEGER NOT NULL
-         );",
+         );
+         CREATE TABLE IF NOT EXISTS settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+         );
+         INSERT OR IGNORE INTO settings (key, value) VALUES
+            ('backend_url',   'http://localhost:13305/api/v1'),
+            ('llm_model',     'Qwen3-4B-Instruct-2507-GGUF'),
+            ('embed_model',   'Qwen3-Embedding-0.6B-GGUF'),
+            ('voice_enabled', 'false'),
+            ('tts_voice',     'ef_dora'),
+            ('top_k',         '6'),
+            ('theme',         'system');",
     )
 }

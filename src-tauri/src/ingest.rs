@@ -8,6 +8,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tiktoken_rs::{cl100k_base, CoreBPE};
 
 use crate::db::DbState;
+use crate::settings::SettingsState;
 
 const MAX_BYTES: u64 = 50 * 1024 * 1024;
 // SPEC §F1: 512-token target with 64-token overlap.
@@ -48,6 +49,7 @@ pub fn ingest_paths(
     app: tauri::AppHandle,
     paths: Vec<String>,
     state: tauri::State<DbState>,
+    s_state: tauri::State<SettingsState>,
 ) -> Result<Vec<IngestResult>, String> {
     let mut out = Vec::with_capacity(paths.len());
     for p in paths {
@@ -66,8 +68,14 @@ pub fn ingest_paths(
                     let db = state.0.clone();
                     let app_clone = app.clone();
                     let doc_id = r.id;
+                    let (backend_url, embed_model) = {
+                        let s = s_state.0.lock().unwrap();
+                        (s.backend_url.clone(), s.embed_model.clone())
+                    };
                     std::thread::spawn(move || {
-                        if let Err(e) = crate::embed::embed_document_impl(app_clone, doc_id, db) {
+                        if let Err(e) = crate::embed::embed_document_impl(
+                            app_clone, doc_id, db, backend_url, embed_model,
+                        ) {
                             eprintln!("auto-embed doc {doc_id}: {e}");
                         }
                     });
@@ -115,6 +123,17 @@ pub fn list_documents(state: tauri::State<DbState>) -> Result<Vec<DocumentRow>, 
         out.push(r.map_err(|e| format!("row list: {e}"))?);
     }
     Ok(out)
+}
+
+#[tauri::command]
+pub fn delete_document(id: i64, state: tauri::State<DbState>) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| format!("db lock: {e}"))?;
+    conn.execute_batch(&format!(
+        "DELETE FROM embeddings WHERE chunk_id IN (SELECT id FROM chunks WHERE document_id = {id});
+         DELETE FROM chunks WHERE document_id = {id};
+         DELETE FROM documents WHERE id = {id};"
+    ))
+    .map_err(|e| format!("deleting document {id}: {e}"))
 }
 
 fn ingest_one(path: &str, state: &DbState) -> Result<IngestResult, String> {

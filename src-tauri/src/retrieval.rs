@@ -5,9 +5,8 @@ use std::time::Instant;
 
 use crate::db::DbState;
 use crate::embed::embed_query;
+use crate::settings::SettingsState;
 
-// SPEC §F4: top-K = 6 chunks for v0.1 (configurable in settings, default 6).
-const DEFAULT_TOP_K: usize = 6;
 // Hard ceiling so a malformed call doesn't drag back thousands of chunks.
 const MAX_TOP_K: usize = 50;
 
@@ -37,16 +36,21 @@ pub fn retrieve(
     query: String,
     top_k: Option<usize>,
     state: tauri::State<DbState>,
+    s_state: tauri::State<SettingsState>,
 ) -> Result<RetrievalResult, String> {
+    let (backend_url, embed_model, settings_top_k) = {
+        let s = s_state.0.lock().map_err(|e| format!("settings lock: {e}"))?;
+        (s.backend_url.clone(), s.embed_model.clone(), s.top_k as usize)
+    };
     let trimmed = query.trim();
     if trimmed.is_empty() {
         return Err("la consulta no puede estar vacía".to_string());
     }
-    let k = top_k.unwrap_or(DEFAULT_TOP_K).clamp(1, MAX_TOP_K);
+    let k = top_k.unwrap_or(settings_top_k).clamp(1, MAX_TOP_K);
 
     // Step 1: embed the question. Hits Lemonade once, no batching.
     let q_started = Instant::now();
-    let q_vec = embed_query(trimmed)?;
+    let q_vec = embed_query(trimmed, &backend_url, &embed_model)?;
     let embed_ms = q_started.elapsed().as_millis() as u64;
     if q_vec.is_empty() {
         return Err("Lemonade devolvió un embedding vacío para la consulta".to_string());

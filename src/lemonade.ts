@@ -33,20 +33,25 @@ const PREFERRED_CHAT_MODELS = ["Qwen3-4B-Instruct-2507-GGUF", "Qwen3-14B-GGUF"];
 
 const NON_CHAT_LABELS = new Set(["embeddings", "audio", "transcription", "tts"]);
 
-let cachedChatModel: string | null = null;
-
-export async function pickChatModel(): Promise<string> {
-  if (cachedChatModel) return cachedChatModel;
-
-  const resp = await fetch(`${LEMONADE_URL}/models`);
+// Always fetches /models so the selected model is guaranteed to be loaded
+// in Lemonade's runtime. If preferredModel is provided and loaded, it wins;
+// otherwise falls back to PREFERRED_CHAT_MODELS order, then any chat model.
+export async function pickChatModel(
+  baseUrl: string = LEMONADE_URL,
+  preferredModel?: string,
+): Promise<string> {
+  const resp = await fetch(`${baseUrl}/models`);
   if (!resp.ok) {
     throw new Error(`Lemonade /models respondió ${resp.status}`);
   }
   const json = (await resp.json()) as ModelsResponse;
 
+  if (preferredModel && json.data.some((m) => m.id === preferredModel)) {
+    return preferredModel;
+  }
+
   for (const preferred of PREFERRED_CHAT_MODELS) {
     if (json.data.some((m) => m.id === preferred)) {
-      cachedChatModel = preferred;
       return preferred;
     }
   }
@@ -61,7 +66,6 @@ export async function pickChatModel(): Promise<string> {
       "Lemonade no tiene ningún modelo de chat disponible. Cargá un modelo desde la UI de Lemonade.",
     );
   }
-  cachedChatModel = fallback.id;
   return fallback.id;
 }
 
@@ -75,10 +79,10 @@ export interface ChatStreamOptions {
 // Streams tokens from /v1/chat/completions. Resolves when the SSE
 // stream emits `data: [DONE]` or the response body closes; rejects on
 // HTTP error or abort. The caller owns the AbortController.
-export async function chatStream(opts: ChatStreamOptions): Promise<void> {
-  const { messages, model, signal, onToken } = opts;
+export async function chatStream(opts: ChatStreamOptions & { baseUrl?: string }): Promise<void> {
+  const { messages, model, signal, onToken, baseUrl = LEMONADE_URL } = opts;
 
-  const resp = await fetch(`${LEMONADE_URL}/chat/completions`, {
+  const resp = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     signal,
@@ -178,12 +182,12 @@ async function blobToWav(blob: Blob): Promise<Blob> {
 
 // Sends a recorded audio blob to Lemonade /audio/transcriptions (Whisper).
 // Converts to WAV first because Lemonade rejects audio/webm (OQ#5-b).
-export async function transcribeAudio(blob: Blob): Promise<string> {
+export async function transcribeAudio(blob: Blob, baseUrl: string = LEMONADE_URL): Promise<string> {
   const wav = await blobToWav(blob);
   const form = new FormData();
   form.append("file", new File([wav], "recording.wav", { type: "audio/wav" }));
   form.append("model", WHISPER_MODEL);
-  const resp = await fetch(`${LEMONADE_URL}/audio/transcriptions`, {
+  const resp = await fetch(`${baseUrl}/audio/transcriptions`, {
     method: "POST",
     body: form,
   });
@@ -196,11 +200,15 @@ export async function transcribeAudio(blob: Blob): Promise<string> {
 }
 
 // Sends text to Lemonade /audio/speech (Kokoro) and returns the audio blob.
-export async function synthesizeSpeech(text: string): Promise<Blob> {
-  const resp = await fetch(`${LEMONADE_URL}/audio/speech`, {
+export async function synthesizeSpeech(
+  text: string,
+  baseUrl: string = LEMONADE_URL,
+  voice: string = KOKORO_VOICE,
+): Promise<Blob> {
+  const resp = await fetch(`${baseUrl}/audio/speech`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ model: KOKORO_MODEL, input: text, voice: KOKORO_VOICE }),
+    body: JSON.stringify({ model: KOKORO_MODEL, input: text, voice }),
   });
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
